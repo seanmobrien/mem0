@@ -1,4 +1,5 @@
 import datetime
+import os
 from fastapi import FastAPI
 from app.database import engine, Base, SessionLocal
 from app.mcp_server import setup_mcp_server
@@ -9,9 +10,9 @@ from app.models import User, App
 from uuid import uuid4
 from app.config import USER_ID, DEFAULT_APP_ID
 
-server = process.env.get("NEXT_PUBLIC_URL", "http://localhost:8000")
+publicUrl = os.genenv("NEXT_PUBLIC_URL") or "http://localhost:8000"
 
-app = FastAPI(title="OpenMemory API", servers=[{"url": server }], root_path_in_servers=False)
+app = FastAPI(title="OpenMemory API", servers=[{"url": publicUrl }], root_path_in_servers=False)
 
 app.add_middleware(
     CORSMiddleware,

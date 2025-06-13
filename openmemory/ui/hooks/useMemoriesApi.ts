@@ -198,7 +198,7 @@ export const useMemoriesApi = (): UseMemoriesApiReturn => {
 
   const deleteMemories = async (memory_ids: string[]) => {
     try {
-      await axios.delete(`${URL}/api/v1/memories/`, {
+      await axios.delete(`${URL}/api/v1/memories`, {
         data: { memory_ids, user_id },
       });
       dispatch(

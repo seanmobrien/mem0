@@ -41,7 +41,7 @@ export const useFiltersApi = (): UseFiltersApiReturn => {
     dispatch(setCategoriesLoading());
     try {
       const response = await axios.get<CategoriesResponse>(
-        `${URL}/api/v1/memories/categories/?user_id=${user_id}/`
+        `${URL}/api/v1/memories/categories/?user_id=${user_id}`
       );
 
       dispatch(

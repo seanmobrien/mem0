@@ -10,7 +10,7 @@ from app.models import User, App
 from uuid import uuid4
 from app.config import USER_ID, DEFAULT_APP_ID
 
-publicUrl = os.genenv("NEXT_PUBLIC_URL") or "http://localhost:8000"
+publicUrl = os.getenv("NEXT_PUBLIC_URL") or "http://localhost:8000"
 
 app = FastAPI(title="OpenMemory API", servers=[{"url": publicUrl }], root_path_in_servers=False)
 

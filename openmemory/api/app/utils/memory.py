@@ -184,7 +184,15 @@ def get_default_memory_config():
                 "hnsw": True,
                 "diskann": False
             }
-        }  ,      
+        } ,
+        "graph_store": {
+            "provider": "neo4j",
+            "config": {
+                "url": "env:NEO4J_URI",
+                "username": "env:NEO4J_USERNAME",
+                "password": "env:NEO4J_PASSWORD",
+            },
+        } ,      
 #        "llm": {
 #            "provider": "openai",
 #            "config": {

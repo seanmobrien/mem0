@@ -110,6 +110,7 @@ def get_parsed_memory_config(custom_instructions: str | None = None):
         # This ensures that even default config values like "env:OPENAI_API_KEY" get parsed
         print("Parsing environment variables in final config...")
         config = _parse_environment_variables(config)
+        return config
     except Exception as e:
         print(f"Warning: Error loading configuration from database: {e}")
         print("Using default configuration")

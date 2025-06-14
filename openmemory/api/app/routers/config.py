@@ -18,9 +18,10 @@ class LLMConfig(BaseModel):
     temperature: Optional[float] = Field(..., description="Temperature setting for the model")
     max_tokens: Optional[int] = Field(..., description="Maximum tokens to generate")
     api_key: Optional[str] = Field(..., description="API key or 'env:LLM_AZURE_OPENAI_API_KEY' to use environment variable")    
-    azure_deployment: Optional[str] = Field(..., description="Deployment name for Azure OpenAI, othewise loaded from LLM_AZURE_DEPLOYMENT")
-    api_version: Optional[str] = Field(..., description="API version for Azure OpenAI, otherwise loaded from LLM_AZURE_OPENAI_API_KEY")
-    azure_endpoint: Optional[str] = Field(..., description="Endpoint URL for Azure OpenAI or Ollama server, otherwise loaded from LLM_AZURE_ENDPOINT")
+    azure_kwargs: Optional[Dict[str, Any]] = Field(
+        default_factory=dict, 
+        description="Azure-specific parameters for the embedder, such as api_key, azure_deployment, azure_endpoint, and api_version"
+    )
 
 class LLMProvider(BaseModel):
     provider: str = Field(..., description="LLM provider name")
@@ -46,11 +47,10 @@ class VectorProvider(BaseModel):
     dbname: Optional[str] = Field(..., description="Database name for the vector store")
     user: Optional[str] = Field(..., description="User for the vector store")
     password: Optional[str] = Field(..., description="Password for the vector store")
-    collectionName: Optional[str] = Field(..., description="Collection name for the vector store")
-    dimension: Optional[int] = Field(..., description="Dimension for the vector store")
-    embeddingModelDims: Optional[int] = Field(..., description="Embedding model dimension for the vector store")
+    collection_name: Optional[str] = Field(..., description="Collection name for the vector store")    
+    embedding_model_dim: Optional[int] = Field(..., description="Embedding model dimension for the vector store")
     hnsw: Optional[bool] = Field( ..., description="If HNSW indexing is available, defaults to True")
-    diskMan: Optional[bool] = Field(..., description="If Diskman algorithm is available, defaults to False")
+    diskann: Optional[bool] = Field(..., description="If Diskman algorithm is available, defaults to False")
 
 class VectorStoreConfig(BaseModel):
     provider: str = Field(..., description="Vector store provider name")
@@ -60,8 +60,8 @@ class GraphProvider(BaseModel):
     url: Optional[str] = Field(..., description="URL for the graph store")
     username: Optional[str] = Field(..., description="Username for the graph store")
     password: Optional[str] = Field(..., description="Password for the graph store")
-    llm: Optional[LLMConfig] = Field(..., description="LLM configuration for querying the graph store")
-    custom_prompt: Optional[str] = Field(..., description="Custom prompt to fetch entities from the given text")
+    # llm: Optional[LLMConfig] = Field(..., description="LLM configuration for querying the graph store")
+    # custom_prompt: Optional[str] = Field(..., description="Custom prompt to fetch entities from the given text")
     
 class GraphStoreConfig(BaseModel):
     provider: str = Field(..., description="Graph store provider name")

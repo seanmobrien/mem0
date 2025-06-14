@@ -137,30 +137,70 @@ def reset_memory_client():
 def get_default_memory_config():
     """Get default memory client configuration with sensible defaults."""
     return {
-        "vector_store": {
-            "provider": "qdrant",
-            "config": {
-                "collection_name": "openmemory",
-                "host": "mem0_store",
-                "port": 6333,
-            }
-        },
+        #"vector_store": {
+        #    "provider": "qdrant",
+        #    "config": {
+        #        "collection_name": "openmemory",
+        #        "host": "mem0_store",
+        #        "port": 6333,
+        #    }
+        #},
         "llm": {
-            "provider": "openai",
-            "config": {
+        "provider": "azure_openai",
+        "config": {
                 "model": "gpt-4o-mini",
                 "temperature": 0.1,
                 "max_tokens": 2000,
-                "api_key": "env:OPENAI_API_KEY"
+                "api_key": "env:OPENAI_API_KEY",
+                "azure_kwargs": {
+                    "azure_deployment": "gpt-4o-mini",
+                    "api_version": "2025-04-01-preview",
+                    "azure_endpoint": "https://schoollaw-1000-eastus096943908820.openai.azure.com/"
+                }
             }
         },
         "embedder": {
-            "provider": "openai",
-            "config": {
-                "model": "text-embedding-3-small",
-                "api_key": "env:OPENAI_API_KEY"
+        "provider": "azure_openai",
+        "config": {
+            "model": "text-embedding-3-small",
+            "azure_kwargs": {
+                "api_key": "env:EMBEDDING_AZURE_OPENAI_API_KEY",
+                "azure_deployment": "text-embedding-3-small",
+                "azure_endpoint": "https://schoollawbot1000.openai.azure.com/",
+                "api_version": "2025-04-01-preview"
             }
-        },
+        }
+        },        
+        "vector_store": {
+            "provider": "pgvector",
+            "config": {
+                "host": "env:PGVECTOR_HOST",
+                "port": 8432,
+                "dbname": "env:PGVECTOR_DB",
+                "user": "env:PGVECTOR_USER",
+                "password": "env:PGVECTOR_PASSWORD",
+                "collection_name": "env:PGVECTOR_COLLECTION_NAME",
+                "embedding_model_dims": 1536,
+                "hnsw": True,
+                "diskann": False
+            }
+        }  ,      
+#        "llm": {
+#            "provider": "openai",
+#            "config": {
+#                "model": "gpt-4o-mini",
+#                "temperature": 0.1,
+#                "max_tokens": 2000,
+#                "api_key": "env:OPENAI_API_KEY"
+##            }
+#        },
+#        "embedder": {
+#            "provider": "openai",
+#            "config": {
+#                "model": "text-embedding-3-small",
+#                "api_key": "env:OPENAI_API_KEY"
+#            }
+#        },
         "version": "v1.1"
     }
 

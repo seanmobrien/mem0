@@ -4,6 +4,7 @@
  */
 
 const nextConfig = {
+  basePath: '/config/memory',
   output: 'standalone',
   eslint: {
     ignoreDuringBuilds: true,

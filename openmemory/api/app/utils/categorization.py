@@ -41,7 +41,7 @@ def get_ai_client() -> AzureOpenAI | OpenAI | None:
                 elif llmProvider == 'openai':
                     openai_client = client.client
                 else:
-                    logging.error(f'Unsupported categorization provider: {config.llm.provider}, returning default OpenAI client')
+                    logging.error(f'Unsupported categorization provider: {llmConfig.get("provider")}, returning default OpenAI client')
                     openai_client = AzureOpenAI()           
     return openai_client or AzureOpenAI()
 

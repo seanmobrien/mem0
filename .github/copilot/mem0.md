@@ -434,12 +434,27 @@ Supported embedding providers:
 ### Core API Methods
 
 #### Adding Memories
+
+**Python:**
 ```python
 # Platform client
 client.add(messages, user_id="user123", metadata={}, output_format="v1.1")
 
 # Self-hosted
 memory.add(messages, user_id="user123", metadata={})
+```
+
+**TypeScript:**
+```typescript
+// Platform client
+await client.add(messages, { 
+    user_id: "user123", 
+    metadata: {}, 
+    output_format: "v1.1" 
+});
+
+// Self-hosted OSS
+await memory.add(messages, "user123", { category: "food" });
 ```
 
 **Parameters:**
@@ -451,6 +466,8 @@ memory.add(messages, user_id="user123", metadata={})
 - `output_format`: Response format version (platform only)
 
 **Message Formats:**
+
+**Python:**
 ```python
 # Text messages
 messages = [
@@ -465,7 +482,33 @@ messages = [
 ]
 ```
 
+**TypeScript:**
+```typescript
+// Text messages
+const messages = [
+    { role: "user" as const, content: "I prefer vegetarian food" },
+    { role: "assistant" as const, content: "I'll remember your vegetarian preference" }
+];
+
+// Multimodal messages
+const multimodalMessages = [
+    { 
+        role: "user" as const, 
+        content: { type: "text", text: "What's in this image?" } 
+    },
+    { 
+        role: "user" as const, 
+        content: { 
+            type: "image_url", 
+            image_url: { url: "https://example.com/image.jpg" } 
+        } 
+    }
+];
+```
+
 #### Searching Memories
+
+**Python:**
 ```python
 # Basic search
 memories = client.search("vegetarian preferences", user_id="user123")
@@ -479,6 +522,31 @@ memories = client.search(
     filters={"category": "food"},
     threshold=0.7
 )
+```
+
+**TypeScript:**
+```typescript
+// Platform client - basic search
+const memories = await client.search("vegetarian preferences", { 
+    user_id: "user123" 
+});
+
+// Platform client - advanced search with filters
+const filteredMemories = await client.search("food preferences", {
+    user_id: "user123",
+    agent_id: "chef_bot",
+    limit: 10,
+    filters: { category: "food" },
+    threshold: 0.7
+});
+
+// OSS - search with options
+const ossMemories = await memory.search({
+    query: "food preferences",
+    userId: "user123",
+    limit: 10,
+    threshold: 0.7
+});
 ```
 
 **Parameters:**
@@ -506,6 +574,8 @@ memories = client.search(
 ```
 
 #### Memory Management
+
+**Python:**
 ```python
 # Get specific memory
 memory_detail = client.get("mem_123")
@@ -524,6 +594,43 @@ client.delete_all(user_id="user123")
 
 # Get memory history
 history = client.history("mem_123")
+```
+
+**TypeScript:**
+```typescript
+// Platform client
+// Get specific memory
+const memoryDetail = await client.get("mem_123");
+
+// Get all memories for user
+const allMemories = await client.get_all({ user_id: "user123" });
+
+// Update memory
+const updated = await client.update("mem_123", { 
+    data: "Updated preference: vegan food only" 
+});
+
+// Delete memory
+await client.delete("mem_123");
+
+// Delete all memories for user
+await client.delete_all({ user_id: "user123" });
+
+// Get memory history
+const history = await client.history("mem_123");
+
+// OSS client
+// Get specific memory
+const ossMemoryDetail = await memory.get("mem_123");
+
+// Update memory
+const ossUpdated = await memory.update("mem_123", "Updated preference: vegan food only");
+
+// Delete memory
+await memory.delete("mem_123");
+
+// Reset all memories
+await memory.reset();
 ```
 
 ### Advanced Features
@@ -2043,12 +2150,20 @@ claude_query = "What framework is this project using?"
 ### Contributing
 
 #### Prerequisites
+
+**Python Development:**
 - Python 3.9+
 - Poetry for dependency management
 - Pre-commit hooks for code quality
 
+**TypeScript Development:**
+- Node.js 18+
+- pnpm (recommended) or npm
+- TypeScript 5.5+
+
 #### Setup Development Environment
 
+**Python:**
 ```bash
 # Clone repository
 git clone https://github.com/mem0ai/mem0.git
@@ -2064,8 +2179,31 @@ poetry shell
 pre-commit install
 ```
 
+**TypeScript:**
+```bash
+# Clone repository
+git clone https://github.com/mem0ai/mem0.git
+cd mem0
+
+# Setup TypeScript SDK
+cd mem0-ts
+pnpm install
+
+# Setup Vercel AI SDK integration
+cd ../vercel-ai-sdk
+pnpm install
+
+# Build packages
+cd ../mem0-ts
+pnpm run build
+
+cd ../vercel-ai-sdk
+pnpm run build
+```
+
 #### Code Standards
 
+**Python:**
 ```bash
 # Linting with ruff
 make lint
@@ -2078,6 +2216,34 @@ make test
 
 # Run all checks
 make check
+```
+
+**TypeScript:**
+```bash
+# For mem0-ts package
+cd mem0-ts
+
+# Linting and formatting
+npm run format:check
+npm run format
+
+# Build package
+npm run build
+
+# Run tests
+npm test
+
+# For vercel-ai-sdk package
+cd ../vercel-ai-sdk
+
+# Type checking
+npm run type-check
+
+# Build package
+npm run build
+
+# Run tests
+npm test
 ```
 
 #### Pull Request Process
@@ -2214,10 +2380,19 @@ mem0/
 ├── examples/               # Code examples and demos
 ├── mem0/                   # Core Python package
 ├── mem0-ts/               # TypeScript/JavaScript SDK
+│   ├── src/
+│   │   ├── client/        # Platform client
+│   │   ├── oss/           # Open-source implementation
+│   │   └── community/     # Community integrations
+│   ├── tests/             # TypeScript tests
+│   └── package.json       # TypeScript package config
 ├── openmemory/            # OpenMemory MCP server
 ├── server/                # Legacy server implementation
-├── tests/                 # Test suite
+├── tests/                 # Python test suite
 ├── vercel-ai-sdk/         # Vercel AI SDK integration
+│   ├── src/               # Provider implementation
+│   ├── tests/             # Integration tests
+│   └── package.json       # AI SDK package config
 ├── pyproject.toml         # Python package configuration
 ├── Makefile              # Development commands
 └── README.md             # Project overview
@@ -2354,7 +2529,7 @@ config = {
 
 **Problem**: Environment variables not being loaded.
 
-**Solutions**:
+**Python Solutions:**
 ```python
 import os
 from dotenv import load_dotenv
@@ -2370,6 +2545,65 @@ for var in required_vars:
 
 # Set in code if needed
 os.environ["OPENAI_API_KEY"] = "your-key"
+```
+
+**TypeScript Solutions:**
+```typescript
+import dotenv from 'dotenv';
+
+// Load environment variables
+dotenv.config();
+
+// Verify variables are set
+const requiredVars = ["OPENAI_API_KEY", "MEM0_API_KEY"];
+for (const varName of requiredVars) {
+    if (!process.env[varName]) {
+        throw new Error(`Missing required environment variable: ${varName}`);
+    }
+}
+
+// For Next.js or client-side applications, use NEXT_PUBLIC_ prefix
+const publicConfig = {
+    apiUrl: process.env.NEXT_PUBLIC_API_URL,
+    // Never expose private keys on client side
+};
+```
+
+#### TypeScript Build Issues
+
+**Problem**: TypeScript compilation errors or module resolution issues.
+
+**Solutions:**
+```bash
+# Clear build cache
+npm run clean
+rm -rf node_modules
+npm install
+
+# Check TypeScript configuration
+npx tsc --noEmit
+
+# Verify peer dependencies
+npm ls
+
+# For ESM/CommonJS issues
+# Ensure package.json has correct "type": "module" or exports
+```
+
+**TypeScript Configuration (tsconfig.json):**
+```json
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "ESNext",
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true
+  }
+}
 ```
 
 #### Memory Conflicts and Updates
@@ -2462,6 +2696,8 @@ config = {
 ### Debugging Tips
 
 #### Enable Logging
+
+**Python:**
 ```python
 import logging
 logging.basicConfig(level=logging.DEBUG)
@@ -2471,7 +2707,26 @@ memory = Memory()
 result = memory.add([{"role": "user", "content": "test"}])
 ```
 
+**TypeScript:**
+```typescript
+// For Node.js applications, you can enable debug logging
+process.env.DEBUG = 'mem0:*';
+
+// Or use console.log for debugging
+const memory = new Memory({
+    // Add debug option if available
+    debug: true
+});
+
+// Log operations
+console.log('Adding memory...');
+const result = await memory.add([{ role: "user", content: "test" }], "user123");
+console.log('Result:', result);
+```
+
 #### Inspect Memory State
+
+**Python:**
 ```python
 # Check memory configuration
 print(memory.config)
@@ -2482,6 +2737,32 @@ print(memory.vector_store.list_cols())
 # Check LLM connectivity
 response = memory.llm.generate_response([{"role": "user", "content": "test"}])
 print(response)
+```
+
+**TypeScript:**
+```typescript
+// Check memory configuration
+console.log('Memory config:', JSON.stringify(memory.config, null, 2));
+
+// Test individual operations
+try {
+    const searchResult = await memory.search({ 
+        query: "test", 
+        userId: "debug_user" 
+    });
+    console.log('Search works:', searchResult.results.length);
+} catch (error) {
+    console.error('Search failed:', error);
+}
+
+// Test client connectivity for platform
+const client = new MemoryClient({ apiKey: process.env.MEM0_API_KEY });
+try {
+    await client.ping();
+    console.log('Client connection successful');
+} catch (error) {
+    console.error('Client connection failed:', error);
+}
 ```
 
 #### Test Individual Components
@@ -2517,6 +2798,21 @@ A: Export memories using `get_all()`, then re-add them to a new Memory instance 
 
 **Q: Can I use multiple LLMs simultaneously?**
 A: Not directly, but you can create multiple Memory instances with different LLM configurations.
+
+**Q: How do I use Mem0 with TypeScript in a Next.js project?**
+A: Install the client SDK with `npm install mem0ai` and use the platform client. For the OSS version, import from `mem0ai/oss`. Ensure environment variables are prefixed with `NEXT_PUBLIC_` if needed on the client side.
+
+**Q: What's the difference between the TypeScript client and OSS packages?**
+A: The client (`mem0ai`) connects to the Mem0 platform for managed hosting. The OSS package (`mem0ai/oss`) runs locally and requires you to configure LLMs, vector stores, and embeddings yourself.
+
+**Q: Can I use Mem0 with Vercel AI SDK for streaming?**
+A: Yes! Use `@mem0/vercel-ai-provider` which provides seamless integration with streaming support and memory context injection.
+
+**Q: How do I handle TypeScript type errors with the Mem0 SDK?**
+A: Ensure you're using the latest TypeScript version (5.5+) and that all peer dependencies are installed. The SDK includes comprehensive TypeScript definitions.
+
+**Q: Can I use Mem0 in a serverless environment like Vercel or Netlify?**
+A: Yes, both the platform client and Vercel AI SDK integration work well in serverless environments. For OSS, consider using lightweight vector stores like Supabase.
 
 **Q: How do I backup my memories?**
 A: Use the export functionality to save memories to JSON, or backup the vector store data directory.

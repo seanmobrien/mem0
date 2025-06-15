@@ -4,18 +4,24 @@ from typing import Dict, Any, Optional
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
+import logging
 from app.database import get_db
 from app.models import Config as ConfigModel
 from app.utils.memory import reset_memory_client
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/config", tags=["config"])
 
 class LLMConfig(BaseModel):
     model: str = Field(..., description="LLM model name")
-    temperature: float = Field(..., description="Temperature setting for the model")
-    max_tokens: int = Field(..., description="Maximum tokens to generate")
-    api_key: Optional[str] = Field(None, description="API key or 'env:API_KEY' to use environment variable")
-    ollama_base_url: Optional[str] = Field(None, description="Base URL for Ollama server (e.g., http://host.docker.internal:11434)")
+    temperature: Optional[float] = Field(..., description="Temperature setting for the model")
+    max_tokens: Optional[int] = Field(..., description="Maximum tokens to generate")
+    api_key: Optional[str] = Field(..., description="API key or 'env:LLM_AZURE_OPENAI_API_KEY' to use environment variable")    
+    azure_kwargs: Optional[Dict[str, Any]] = Field(
+        default_factory=dict, 
+        description="Azure-specific parameters for the embedder, such as api_key, azure_deployment, azure_endpoint, and api_version"
+    )
 
 class LLMProvider(BaseModel):
     provider: str = Field(..., description="LLM provider name")
@@ -23,89 +29,182 @@ class LLMProvider(BaseModel):
 
 class EmbedderConfig(BaseModel):
     model: str = Field(..., description="Embedder model name")
-    api_key: Optional[str] = Field(None, description="API key or 'env:API_KEY' to use environment variable")
-    ollama_base_url: Optional[str] = Field(None, description="Base URL for Ollama server (e.g., http://host.docker.internal:11434)")
-
+    azure_kwargs: Optional[Dict[str, Any]] = Field(
+        default_factory=dict, 
+        description="Azure-specific parameters for the embedder, such as api_key, azure_deployment, azure_endpoint, and api_version"
+    )
+    
 class EmbedderProvider(BaseModel):
     provider: str = Field(..., description="Embedder provider name")
     config: EmbedderConfig
 
 class OpenMemoryConfig(BaseModel):
-    custom_instructions: Optional[str] = Field(None, description="Custom instructions for memory management and fact extraction")
+    custom_instructions: Optional[str] = Field(..., description="Custom instructions for memory management and fact extraction")
+
+class VectorProvider(BaseModel):
+    host: Optional[str] = Field(..., description="Host for the vector store")
+    port: Optional[int] = Field(..., description="Port for the vector store")
+    dbname: Optional[str] = Field(..., description="Database name for the vector store")
+    user: Optional[str] = Field(..., description="User for the vector store")
+    password: Optional[str] = Field(..., description="Password for the vector store")
+    collection_name: Optional[str] = Field(..., description="Collection name for the vector store")    
+    embedding_model_dim: Optional[int] = Field(..., description="Embedding model dimension for the vector store")
+    hnsw: Optional[bool] = Field( ..., description="If HNSW indexing is available, defaults to True")
+    diskann: Optional[bool] = Field(..., description="If Diskman algorithm is available, defaults to False")
+
+class VectorStoreConfig(BaseModel):
+    provider: str = Field(..., description="Vector store provider name")
+    config: VectorProvider
+
+class GraphProvider(BaseModel):
+    url: Optional[str] = Field(..., description="URL for the graph store")
+    username: Optional[str] = Field(..., description="Username for the graph store")
+    password: Optional[str] = Field(..., description="Password for the graph store")
+    # llm: Optional[LLMConfig] = Field(..., description="LLM configuration for querying the graph store")
+    # custom_prompt: Optional[str] = Field(..., description="Custom prompt to fetch entities from the given text")
+    
+class GraphStoreConfig(BaseModel):
+    provider: str = Field(..., description="Graph store provider name")
+    config: GraphProvider
 
 class Mem0Config(BaseModel):
     llm: Optional[LLMProvider] = None
     embedder: Optional[EmbedderProvider] = None
+    vector_store: Optional[VectorStoreConfig] = None
+    graph_store: Optional[GraphStoreConfig] = None
+    enable_graph: Optional[bool] = Field(..., description="If True, enables the graph store for advanced querying and relationships")
+    version: Optional[str] = Field(..., description="Version of the Mem0 configuration, defaults to 'v1'")
 
 class ConfigSchema(BaseModel):
     openmemory: Optional[OpenMemoryConfig] = None
-    mem0: Mem0Config
+    mem0: Optional[Mem0Config] = None
 
 def get_default_configuration():
     """Get the default configuration with sensible defaults for LLM and embedder."""
     return {
-        "openmemory": {
-            "custom_instructions": None
-        },
-        "mem0": {
-            "llm": {
-                "provider": "openai",
-                "config": {
-                    "model": "gpt-4o-mini",
-                    "temperature": 0.1,
-                    "max_tokens": 2000,
-                    "api_key": "env:OPENAI_API_KEY"
-                }
-            },
-            "embedder": {
-                "provider": "openai",
-                "config": {
-                    "model": "text-embedding-3-small",
-                    "api_key": "env:OPENAI_API_KEY"
-                }
-            }
+    "openmemory": {
+      "custom_instructions": None
+    },
+    "mem0": {
+      "llm": {
+        "provider": "azure_openai",
+        "config": {
+          "model": "gpt-4o-mini",
+          "temperature": 0.1,
+          "max_tokens": 2000,
+          "api_key": "env:OPENAI_API_KEY",
+          "azure_deployment": "gpt-4o-mini",
+          "api_version": "2025-04-01-preview",
+          "azure_endpoint": "https://schoollaw-1000-eastus096943908820.openai.azure.com/"
         }
+      },
+      "embedder": {
+        "provider": "azure_openai",
+        "config": {
+          "model": "text-embedding-3-small",          
+          "azure_kwargs": {
+            "api_key": "env:OPENAI_API_KEY",
+            "azure_deployment": "text-embedding-3-small",
+            "azure_endpoint": "https://schoollawbot1000.openai.azure.com/",
+            "api_version": "2025-04-01-preview"    
+          }          
+        }
+      },
+      "vector_store": {
+        "provider": "pgvector",
+        "config": {
+          "host": "env:PGVECTOR_HOST",
+          "port": 8432,
+          "dbname": "env:PGVECTOR_DB",
+          "user": "env:PGVECTOR_USER",
+          "password": "env:PGVECTOR_PASSWORD",
+          "collectionName": "env:PGVECTOR_COLLECTION_NAME",
+          "dimension": 1536,
+          "embeddingModelDims": 1536,
+          "hnsw": True,
+          "diskMan": False
+        }
+      },
+      "graph_store": {
+        "provider": "neo4j",
+        "config": {
+          "url": "env:NEO4J_URI",
+          "username": "env:NEO4J_USERNAME",
+          "password": "env:NEO4J_PASSWORD",
+          "llm": {
+            "model": "gpt-4o-mini",
+            "temperature": 0.1,
+            "max_tokens": 2000,
+            "api_key": "env:OPENAI_API_KEY",
+            "azure_deployment": "gpt-4o-mini",
+            "api_version": "2025-04-01-preview",
+            "azure_endpoint": "https://schoollaw-1000-eastus096943908820.openai.azure.com/"
+          },
+          "custom_prompt": "Please focus extraction on people, statements, and actions that could have relevance within the context of investigations into educational malfeasance or record cover-up"
+        }
+      },
+      "enable_graph": True
     }
+  }
+      
 
 def get_config_from_db(db: Session, key: str = "main"):
     """Get configuration from database."""
-    config = db.query(ConfigModel).filter(ConfigModel.key == key).first()
-    
-    if not config:
-        # Create default config with proper provider configurations
-        default_config = get_default_configuration()
-        db_config = ConfigModel(key=key, value=default_config)
-        db.add(db_config)
-        db.commit()
-        db.refresh(db_config)
-        return default_config
-    
-    # Ensure the config has all required sections with defaults
-    config_value = config.value
-    default_config = get_default_configuration()
-    
-    # Merge with defaults to ensure all required fields exist
-    if "openmemory" not in config_value:
-        config_value["openmemory"] = default_config["openmemory"]
-    
-    if "mem0" not in config_value:
-        config_value["mem0"] = default_config["mem0"]
-    else:
-        # Ensure LLM config exists with defaults
-        if "llm" not in config_value["mem0"] or config_value["mem0"]["llm"] is None:
-            config_value["mem0"]["llm"] = default_config["mem0"]["llm"]
+    try:
+        config = db.query(ConfigModel).filter(ConfigModel.key == key).first()
         
-        # Ensure embedder config exists with defaults
-        if "embedder" not in config_value["mem0"] or config_value["mem0"]["embedder"] is None:
-            config_value["mem0"]["embedder"] = default_config["mem0"]["embedder"]
-    
-    # Save the updated config back to database if it was modified
-    if config_value != config.value:
-        config.value = config_value
-        db.commit()
-        db.refresh(config)
-    
-    return config_value
+        if not config:
+            # Create default config with proper provider configurations
+            default_config = get_default_configuration()
+            db_config = ConfigModel(key=key, value=default_config)
+            db.add(db_config)
+            db.commit()
+            db.refresh(db_config)
+            return default_config
+        
+        # Ensure the config has all required sections with defaults
+        config_value = config.value
+        default_config = get_default_configuration()
+        
+        # Merge with defaults to ensure all required fields exist
+        if "openmemory" not in config_value:
+            config_value["openmemory"] = default_config["openmemory"]
+        
+        if "mem0" not in config_value:
+            config_value["mem0"] = default_config["mem0"]
+        else:
+            # Ensure LLM config exists with defaults
+            if "llm" not in config_value["mem0"] or config_value["mem0"]["llm"] is None:
+                config_value["mem0"]["llm"] = default_config["mem0"]["llm"]
+            
+            # Ensure embedder config exists with defaults
+            if "embedder" not in config_value["mem0"] or config_value["mem0"]["embedder"] is None:
+                config_value["mem0"]["embedder"] = default_config["mem0"]["embedder"]
+            
+            # Enable graph if not explicitly set
+            if "enable_graph" not in config_value["mem0"]:
+                config_value["mem0"]["enable_graph"] = "graph_store" in config_value["mem0"] and config_value["mem0"]["graph_store"] is not None                
+        
+        # Save the updated config back to database if it was modified
+        if config_value != config.value:
+            config.value = config_value
+            db.commit()
+            db.refresh(config)
+        
+        logger.info(f"Configuration loaded from database: {config_value}")
+
+        return config_value
+    except Exception as e:
+        logger.error(f"Error loading configuration from database: {str(e)}")
+        save_config_to_db(db, get_default_configuration())
+        try:
+            db_config = ConfigModel(key=key, value=config)
+            db.add(db_config)
+        except Exception as e:            
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to load configuration: {str(e)}"
+            )
 
 def save_config_to_db(db: Session, config: Dict[str, Any], key: str = "main"):
     """Save configuration to database."""

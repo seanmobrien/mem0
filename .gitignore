@@ -186,3 +186,7 @@ eval/
 qdrant_storage/
 .crossnote
 testing.ipynb
+
+# IDEs
+.vscode
+**/.vscode/** 

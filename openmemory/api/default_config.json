@@ -1,7 +1,10 @@
 {
+  "openmemory": {
+    "custom_instructions": null
+  },
   "mem0": {
     "llm": {
-      "provider": "azure_openai",
+      "provider": "openai",
       "config": {
         "model": "gpt-4o-mini",
         "temperature": 0.1,
@@ -10,7 +13,7 @@
       }
     },
     "embedder": {
-      "provider": "azure_openai",
+      "provider": "openai",
       "config": {
         "model": "text-embedding-3-small",
         "api_key": "env:OPENAI_API_KEY"

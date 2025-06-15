@@ -137,14 +137,6 @@ def reset_memory_client():
 def get_default_memory_config():
     """Get default memory client configuration with sensible defaults."""
     return {
-        #"vector_store": {
-        #    "provider": "qdrant",
-        #    "config": {
-        #        "collection_name": "openmemory",
-        #        "host": "mem0_store",
-        #        "port": 6333,
-        #    }
-        #},
         "llm": {
         "provider": "azure_openai",
         "config": {
@@ -193,22 +185,7 @@ def get_default_memory_config():
                 "password": "env:NEO4J_PASSWORD",
             },
         } ,      
-#        "llm": {
-#            "provider": "openai",
-#            "config": {
-#                "model": "gpt-4o-mini",
-#                "temperature": 0.1,
-#                "max_tokens": 2000,
-#                "api_key": "env:OPENAI_API_KEY"
-##            }
-#        },
-#        "embedder": {
-#            "provider": "openai",
-#            "config": {
-#                "model": "text-embedding-3-small",
-#                "api_key": "env:OPENAI_API_KEY"
-#            }
-#        },
+        "enable_graph_store": True,
         "version": "v1.1"
     }
 

@@ -1,0 +1,9 @@
+POST http://localhost:8000/api/v1/memories/
+content-type: application/json
+
+{
+    "user_id": "test",
+    "text": "My name is John Doe and I live in New York City.",
+    "infer": false,
+    "app": "openmemory"
+}

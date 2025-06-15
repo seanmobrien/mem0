@@ -72,6 +72,8 @@ class Mem0Config(BaseModel):
     embedder: Optional[EmbedderProvider] = None
     vector_store: Optional[VectorStoreConfig] = None
     graph_store: Optional[GraphStoreConfig] = None
+    enable_graph: Optional[bool] = Field(..., description="If True, enables the graph store for advanced querying and relationships")
+    version: Optional[str] = Field(..., description="Version of the Mem0 configuration, defaults to 'v1'")
 
 class ConfigSchema(BaseModel):
     openmemory: Optional[OpenMemoryConfig] = None
@@ -140,7 +142,8 @@ def get_default_configuration():
           },
           "custom_prompt": "Please focus extraction on people, statements, and actions that could have relevance within the context of investigations into educational malfeanse or record cover-up"
         }
-      }
+      },
+      "enable_graph": True
     }
   }
       
@@ -177,6 +180,10 @@ def get_config_from_db(db: Session, key: str = "main"):
             # Ensure embedder config exists with defaults
             if "embedder" not in config_value["mem0"] or config_value["mem0"]["embedder"] is None:
                 config_value["mem0"]["embedder"] = default_config["mem0"]["embedder"]
+            
+            # Enable graph if not explicitly set
+            if "enable_graph" not in config_value["mem0"]:
+                config_value["mem0"]["enable_graph"] = "graph_store" in config_value["mem0"] and config_value["mem0"]["graph_store"] is not None                
         
         # Save the updated config back to database if it was modified
         if config_value != config.value:

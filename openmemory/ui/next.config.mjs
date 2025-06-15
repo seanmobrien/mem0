@@ -4,8 +4,6 @@
  */
 
 const nextConfig = {
-  basePath: '/config/memory',
-  distDir: '/config/memory/.next',
   eslint: {
     ignoreDuringBuilds: true,
   },

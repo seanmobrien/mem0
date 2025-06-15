@@ -69,8 +69,11 @@ Get up and running in minutes with automatic updates, analytics, and enterprise 
 # Python
 pip install mem0ai
 
-# Node.js
+# TypeScript/JavaScript
 npm install mem0ai
+
+# For Vercel AI SDK integration
+npm install @mem0/vercel-ai-provider
 ```
 
 4. Set up your client:
@@ -83,9 +86,23 @@ os.environ["MEM0_API_KEY"] = "your-api-key"
 client = MemoryClient()
 ```
 
-```javascript
+```typescript
 import MemoryClient from 'mem0ai';
-const client = new MemoryClient({ apiKey: 'your-api-key' });
+
+const client = new MemoryClient({ 
+  apiKey: 'your-api-key',
+  // Optional: specify organization and project
+  organizationName: 'your-org',
+  projectName: 'your-project'
+});
+```
+
+```javascript
+const MemoryClient = require('mem0ai').default;
+
+const client = new MemoryClient({ 
+  apiKey: 'your-api-key' 
+});
 ```
 
 ### Self-Hosted (Open Source)
@@ -94,7 +111,7 @@ const client = new MemoryClient({ apiKey: 'your-api-key' });
 # Install via pip
 pip install mem0ai
 
-# Install via npm  
+# Install via npm for TypeScript/JavaScript
 npm install mem0ai
 ```
 
@@ -102,6 +119,7 @@ npm install mem0ai
 
 ### Basic Instantiation
 
+**Python:**
 ```python
 from openai import OpenAI
 from mem0 import Memory
@@ -123,10 +141,50 @@ config = {
 memory = Memory.from_config(config)
 ```
 
+**TypeScript:**
+```typescript
+import { Memory } from 'mem0ai/oss';
+import dotenv from 'dotenv';
+
+dotenv.config();
+
+// Basic usage with default configuration
+const memory = new Memory();
+
+// With custom configuration
+const memory = new Memory({
+  version: "v1.1",
+  llm: {
+    provider: "openai",
+    config: {
+      apiKey: process.env.OPENAI_API_KEY,
+      model: "gpt-4o-mini",
+      temperature: 0.2,
+      maxTokens: 1500
+    }
+  },
+  embedder: {
+    provider: "openai",
+    config: {
+      apiKey: process.env.OPENAI_API_KEY,
+      model: "text-embedding-3-small"
+    }
+  },
+  vectorStore: {
+    provider: "memory", // In-memory store
+    config: {
+      collectionName: "memories",
+      dimension: 1536
+    }
+  }
+});
+```
+
 ## Basic Usage
 
 ### Core Chat Pattern with Memory
 
+**Python:**
 ```python
 from openai import OpenAI
 from mem0 import Memory
@@ -162,8 +220,71 @@ def main():
         print(f"AI: {chat_with_memories(user_input)}")
 ```
 
+**TypeScript:**
+```typescript
+import { Memory } from 'mem0ai/oss';
+import OpenAI from 'openai';
+
+const openai = new OpenAI();
+const memory = new Memory();
+
+async function chatWithMemories(message: string, userId: string = "default_user"): Promise<string> {
+    // Retrieve relevant memories
+    const relevantMemories = await memory.search({ query: message, userId, limit: 3 });
+    const memoriesStr = relevantMemories.results.map(entry => `- ${entry.memory}`).join('\n');
+
+    // Generate Assistant response
+    const systemPrompt = `You are a helpful AI. Answer the question based on query and memories.\nUser Memories:\n${memoriesStr}`;
+    const messages = [
+        { role: "system" as const, content: systemPrompt },
+        { role: "user" as const, content: message }
+    ];
+    
+    const response = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages
+    });
+    
+    const assistantResponse = response.choices[0].message.content!;
+
+    // Create new memories from the conversation
+    const conversationMessages = [
+        ...messages,
+        { role: "assistant" as const, content: assistantResponse }
+    ];
+    await memory.add(conversationMessages, userId);
+
+    return assistantResponse;
+}
+
+// Usage
+async function main() {
+    console.log("Chat with AI (type 'exit' to quit)");
+    const readline = require('readline').createInterface({
+        input: process.stdin,
+        output: process.stdout
+    });
+
+    const askQuestion = () => {
+        readline.question("You: ", async (userInput: string) => {
+            if (userInput.toLowerCase() === 'exit') {
+                console.log("Goodbye!");
+                readline.close();
+                return;
+            }
+            const response = await chatWithMemories(userInput);
+            console.log(`AI: ${response}`);
+            askQuestion();
+        });
+    };
+
+    askQuestion();
+}
+```
+
 ### Platform Client Usage
 
+**Python:**
 ```python
 from mem0 import MemoryClient
 
@@ -183,8 +304,30 @@ memories = client.search("food preferences", user_id="alex")
 print(memories)
 ```
 
+**TypeScript:**
+```typescript
+import MemoryClient from 'mem0ai';
+
+const client = new MemoryClient({ apiKey: process.env.MEM0_API_KEY });
+
+// Add memories
+const messages = [
+    { role: "user", content: "Thinking of making a sandwich. What do you recommend?" },
+    { role: "assistant", content: "How about adding some cheese for extra flavor?" },
+    { role: "user", content: "Actually, I don't like cheese." },
+    { role: "assistant", content: "I'll remember that you don't like cheese for future recommendations." }
+];
+
+await client.add(messages, { user_id: "alex" });
+
+// Search memories
+const memories = await client.search("food preferences", { user_id: "alex" });
+console.log(memories);
+```
+
 ### Multi-Modal Support
 
+**Python:**
 ```python
 # Add image or PDF as memory
 pdf_message = {"role": "user", "content": {"type": "pdf_url", "pdf_url": {"url": "https://example.com/document.pdf"}}}
@@ -192,6 +335,28 @@ client.add([pdf_message], user_id="user123")
 
 image_message = {"role": "user", "content": {"type": "image_url", "image_url": {"url": "https://example.com/image.jpg"}}}
 client.add([image_message], user_id="user123")
+```
+
+**TypeScript:**
+```typescript
+// Add image or PDF as memory
+const pdfMessage = {
+    role: "user" as const,
+    content: {
+        type: "pdf_url",
+        pdf_url: { url: "https://example.com/document.pdf" }
+    }
+};
+await client.add([pdfMessage], { user_id: "user123" });
+
+const imageMessage = {
+    role: "user" as const,
+    content: {
+        type: "image_url",
+        image_url: { url: "https://example.com/image.jpg" }
+    }
+};
+await client.add([imageMessage], { user_id: "user123" });
 ```
 
 ## Core Components
@@ -426,6 +591,7 @@ memory = Memory.from_config(config)
 
 ### Memory Configuration
 
+**Python:**
 ```python
 from mem0 import Memory
 from mem0.configs.base import MemoryConfig
@@ -475,9 +641,58 @@ config = {
 memory = Memory.from_config(config)
 ```
 
+**TypeScript:**
+```typescript
+import { Memory } from 'mem0ai/oss';
+
+// Basic configuration
+const memory = new Memory();
+
+// Detailed configuration
+const memory = new Memory({
+    version: "v1.1",
+    llm: {
+        provider: "openai",
+        config: {
+            apiKey: process.env.OPENAI_API_KEY,
+            model: "gpt-4o-mini",
+            temperature: 0.1,
+            maxTokens: 2000
+        }
+    },
+    embedder: {
+        provider: "openai",
+        config: {
+            apiKey: process.env.OPENAI_API_KEY,
+            model: "text-embedding-3-small"
+        }
+    },
+    vectorStore: {
+        provider: "qdrant",
+        config: {
+            collectionName: "mem0_collection",
+            embeddingModelDims: 1536,
+            url: "localhost",
+            port: 6333
+        }
+    },
+    graphStore: {
+        provider: "neo4j",
+        config: {
+            url: "bolt://localhost:7687",
+            username: "neo4j",
+            password: "password"
+        }
+    },
+    historyDbPath: "./memory.db"
+});
+```
+
 ### LLM Configuration Options
 
 #### OpenAI Configuration
+
+**Python:**
 ```python
 llm_config = {
     "provider": "openai",
@@ -494,7 +709,95 @@ llm_config = {
 }
 ```
 
+**TypeScript:**
+```typescript
+const llmConfig = {
+    provider: "openai",
+    config: {
+        apiKey: process.env.OPENAI_API_KEY,
+        model: "gpt-4o-mini",          // or gpt-4, gpt-3.5-turbo
+        temperature: 0.1,              // 0.0 to 1.0
+        maxTokens: 2000,               // Response length limit
+        topP: 0.1,                     // Nucleus sampling
+        baseURL: "https://api.openai.com/v1",  // Custom endpoint
+        enableVision: true,            // For multimodal models
+        visionDetails: "auto"          // auto, low, high
+    }
+};
+```
+
+#### Anthropic Configuration
+
+**Python:**
+```python
+llm_config = {
+    "provider": "anthropic",
+    "config": {
+        "model": "claude-3-haiku-20240307",  # or claude-3-sonnet, claude-3-opus
+        "temperature": 0.1,
+        "max_tokens": 2000,
+        "api_key": "your-anthropic-key"
+    }
+}
+```
+
+**TypeScript:**
+```typescript
+const llmConfig = {
+    provider: "anthropic",
+    config: {
+        apiKey: process.env.ANTHROPIC_API_KEY,
+        model: "claude-3-haiku-20240307",  // or claude-3-sonnet, claude-3-opus
+        temperature: 0.1,
+        maxTokens: 2000
+    }
+};
+```
+
+#### Mistral Configuration
+
+**TypeScript:**
+```typescript
+const llmConfig = {
+    provider: "mistral",
+    config: {
+        apiKey: process.env.MISTRAL_API_KEY,
+        model: "mistral-small-latest",
+        temperature: 0.1,
+        maxTokens: 2000
+    }
+};
+```
+
+#### Local LLM Configuration (Ollama)
+
+**Python:**
+```python
+llm_config = {
+    "provider": "ollama",
+    "config": {
+        "model": "llama3.1:8b",
+        "temperature": 0.1,
+        "ollama_base_url": "http://localhost:11434"
+    }
+}
+```
+
+**TypeScript:**
+```typescript
+const llmConfig = {
+    provider: "ollama",
+    config: {
+        model: "llama3.1:8b",
+        temperature: 0.1,
+        baseURL: "http://localhost:11434"
+    }
+};
+```
+
 #### Azure OpenAI Configuration
+
+**Python:**
 ```python
 llm_config = {
     "provider": "azure_openai",
@@ -510,34 +813,27 @@ llm_config = {
 }
 ```
 
-#### Anthropic Configuration
-```python
-llm_config = {
-    "provider": "anthropic",
-    "config": {
-        "model": "claude-3-haiku-20240307",  # or claude-3-sonnet, claude-3-opus
-        "temperature": 0.1,
-        "max_tokens": 2000,
-        "api_key": "your-anthropic-key"
+**TypeScript:**
+```typescript
+const llmConfig = {
+    provider: "azure_openai",
+    config: {
+        model: "gpt-4",
+        azureKwargs: {
+            apiKey: process.env.AZURE_OPENAI_API_KEY,
+            apiVersion: "2024-02-01",
+            azureEndpoint: "https://your-resource.openai.azure.com",
+            azureDeployment: "your-deployment-name"
+        }
     }
-}
-```
-
-#### Local LLM Configuration (Ollama)
-```python
-llm_config = {
-    "provider": "ollama",
-    "config": {
-        "model": "llama3.1:8b",
-        "temperature": 0.1,
-        "ollama_base_url": "http://localhost:11434"
-    }
-}
+};
 ```
 
 ### Vector Store Configuration Options
 
 #### Qdrant Configuration
+
+**Python:**
 ```python
 vector_config = {
     "provider": "qdrant",
@@ -551,7 +847,52 @@ vector_config = {
 }
 ```
 
+**TypeScript:**
+```typescript
+const vectorConfig = {
+    provider: "qdrant",
+    config: {
+        collectionName: "mem0_collection",
+        embeddingModelDims: 1536,
+        url: "localhost",
+        port: 6333,
+        path: "/path/to/qdrant/storage"  // For local storage
+    }
+};
+```
+
+#### Supabase Configuration
+
+**TypeScript:**
+```typescript
+const vectorConfig = {
+    provider: "supabase",
+    config: {
+        supabaseUrl: process.env.SUPABASE_URL,
+        supabaseKey: process.env.SUPABASE_KEY,
+        tableName: "memories",
+        embeddingColumnName: "embedding",
+        metadataColumnName: "metadata"
+    }
+};
+```
+
+#### In-Memory Configuration
+
+**TypeScript:**
+```typescript
+const vectorConfig = {
+    provider: "memory",
+    config: {
+        collectionName: "mem0_collection",
+        dimension: 1536
+    }
+};
+```
+
 #### Pinecone Configuration
+
+**Python:**
 ```python
 vector_config = {
     "provider": "pinecone",
@@ -563,7 +904,21 @@ vector_config = {
 }
 ```
 
+**TypeScript:**
+```typescript
+const vectorConfig = {
+    provider: "pinecone",
+    config: {
+        apiKey: process.env.PINECONE_API_KEY,
+        indexName: "mem0-index",
+        environment: "us-west1-gcp"
+    }
+};
+```
+
 #### Chroma Configuration
+
+**Python:**
 ```python
 vector_config = {
     "provider": "chroma",
@@ -576,9 +931,24 @@ vector_config = {
 }
 ```
 
+**TypeScript:**
+```typescript
+const vectorConfig = {
+    provider: "chroma",
+    config: {
+        collectionName: "mem0_collection",
+        path: "/path/to/chroma/db",
+        host: "localhost",
+        port: 8000
+    }
+};
+```
+
 ### Embedding Configuration Options
 
 #### OpenAI Embeddings
+
+**Python:**
 ```python
 embedder_config = {
     "provider": "openai",
@@ -589,7 +959,20 @@ embedder_config = {
 }
 ```
 
+**TypeScript:**
+```typescript
+const embedderConfig = {
+    provider: "openai",
+    config: {
+        apiKey: process.env.OPENAI_API_KEY,
+        model: "text-embedding-3-small"  // or text-embedding-3-large
+    }
+};
+```
+
 #### HuggingFace Embeddings
+
+**Python:**
 ```python
 embedder_config = {
     "provider": "huggingface",
@@ -600,8 +983,20 @@ embedder_config = {
 }
 ```
 
+**TypeScript:**
+```typescript
+const embedderConfig = {
+    provider: "huggingface",
+    config: {
+        model: "all-MiniLM-L6-v2",     // or any sentence-transformer model
+        apiKey: process.env.HF_TOKEN   // Optional for private models
+    }
+};
+```
+
 ### Environment Variables
 
+**Shell:**
 ```bash
 # API Keys
 export OPENAI_API_KEY="your-openai-key"
@@ -614,6 +1009,26 @@ export QDRANT_URL="localhost:6333"
 
 # Custom paths
 export MEM0_DIR="/custom/mem0/directory"
+```
+
+**TypeScript (.env file):**
+```bash
+# API Keys
+OPENAI_API_KEY=your-openai-key
+ANTHROPIC_API_KEY=your-anthropic-key
+MISTRAL_API_KEY=your-mistral-key
+MEM0_API_KEY=your-mem0-platform-key
+
+# Vector Store
+PINECONE_API_KEY=your-pinecone-key
+QDRANT_URL=localhost:6333
+SUPABASE_URL=your-supabase-url
+SUPABASE_KEY=your-supabase-key
+
+# Neo4j (for graph memory)
+NEO4J_URL=neo4j://localhost:7687
+NEO4J_USERNAME=neo4j
+NEO4J_PASSWORD=password
 ```
 
 ### Custom Prompts Configuration
@@ -686,6 +1101,124 @@ def generate_response(input_text: str, user_id: str):
     return response.content
 ```
 
+### Vercel AI SDK Integration
+
+Build conversational AI applications with persistent memory using the Vercel AI SDK integration.
+
+```bash
+npm install @mem0/vercel-ai-provider
+```
+
+#### Basic Usage with Mem0 Provider
+
+```typescript
+import { generateText } from 'ai';
+import { createMem0 } from '@mem0/vercel-ai-provider';
+
+// Initialize Mem0 provider
+const mem0 = createMem0({
+  provider: 'openai',
+  mem0ApiKey: process.env.MEM0_API_KEY,
+  apiKey: process.env.OPENAI_API_KEY,
+  config: {
+    compatibility: 'strict'
+  }
+});
+
+// Generate text with memory context
+const { text } = await generateText({
+  model: mem0('gpt-4o', {
+    user_id: 'user123'
+  }),
+  prompt: 'What did I tell you about my preferences?'
+});
+
+console.log(text); // AI responds with remembered information
+```
+
+#### Streaming Support
+
+```typescript
+import { streamText } from 'ai';
+import { createMem0 } from '@mem0/vercel-ai-provider';
+
+const mem0 = createMem0();
+
+const { textStream } = await streamText({
+  model: mem0('gpt-4o', {
+    user_id: 'user123'
+  }),
+  prompt: 'Suggest me a good car to buy based on my preferences!'
+});
+
+for await (const textPart of textStream) {
+  process.stdout.write(textPart);
+}
+```
+
+#### Memory Utilities
+
+```typescript
+import { addMemories, retrieveMemories, getMemories } from '@mem0/vercel-ai-provider';
+import { generateText } from 'ai';
+import { openai } from '@ai-sdk/openai';
+
+// Add memories manually
+const memories = [
+  {
+    role: 'user',
+    content: [
+      { type: 'text', text: 'I love red cars.' },
+      { type: 'text', text: 'I prefer Toyota cars.' },
+      { type: 'text', text: 'I like SUVs.' }
+    ]
+  }
+];
+
+await addMemories(memories, { user_id: 'user123' });
+
+// Retrieve memories for context
+const prompt = 'Suggest me a good car to buy.';
+const memoryContext = await retrieveMemories(prompt, { user_id: 'user123' });
+
+const { text } = await generateText({
+  model: openai('gpt-4o'),
+  prompt: prompt,
+  system: memoryContext
+});
+
+// Get memories in array format
+const userMemories = await getMemories('car preferences', { user_id: 'user123' });
+console.log(userMemories);
+```
+
+#### Advanced Integration with Multiple Providers
+
+```typescript
+import { generateText, LanguageModelV1Prompt } from 'ai';
+import { anthropic } from '@ai-sdk/anthropic';
+import { retrieveMemories } from '@mem0/vercel-ai-provider';
+
+const messages: LanguageModelV1Prompt = [
+  {
+    role: 'user',
+    content: [
+      { type: 'text', text: 'Suggest me a good car to buy.' },
+      { type: 'text', text: 'Why is it better than other cars for me?' }
+    ]
+  }
+];
+
+// Retrieve memories based on conversation
+const memories = await retrieveMemories(messages, { user_id: 'user123' });
+
+const { text } = await generateText({
+  model: anthropic('claude-3-haiku-20240307'),
+  messages: messages,
+  system: memories
+});
+```
+
 ### AutoGen Integration
 
 Create conversational AI agents with memory capabilities using AutoGen and Mem0.
@@ -730,6 +1263,7 @@ def get_context_aware_response(question, user_id):
 
 Build a context-aware customer support system that remembers past interactions:
 
+**Python:**
 ```python
 import os
 from typing import List, Dict
@@ -789,6 +1323,82 @@ chatbot = SupportChatbot()
 response = chatbot.handle_customer_query("user123", "I need help with my order")
 ```
 
+**TypeScript:**
+```typescript
+import { Memory } from 'mem0ai/oss';
+import Anthropic from '@anthropic-ai/sdk';
+
+class SupportChatbot {
+    private client: Anthropic;
+    private memory: Memory;
+
+    constructor() {
+        this.client = new Anthropic({
+            apiKey: process.env.ANTHROPIC_API_KEY
+        });
+        
+        this.memory = new Memory({
+            version: "v1.1",
+            llm: {
+                provider: "anthropic",
+                config: {
+                    apiKey: process.env.ANTHROPIC_API_KEY,
+                    model: "claude-3-5-sonnet-latest",
+                    temperature: 0.1,
+                    maxTokens: 2000
+                }
+            }
+        });
+    }
+
+    async handleCustomerQuery(userId: string, query: string): Promise<string> {
+        // Get relevant past interactions
+        const relevantHistory = await this.memory.search({
+            query,
+            userId,
+            limit: 5
+        });
+
+        // Build context
+        let context = "Previous interactions:\n";
+        for (const memory of relevantHistory.results) {
+            context += `- ${memory.memory}\n`;
+        }
+
+        const prompt = `
+        You are a customer support agent. Use past interactions for context.
+        
+        ${context}
+        
+        Current query: ${query}
+        Provide helpful response based on history.
+        `;
+
+        const response = await this.client.messages.create({
+            model: "claude-3-5-sonnet-latest",
+            max_tokens: 1000,
+            messages: [{ role: "user", content: prompt }]
+        });
+
+        const responseText = response.content[0].type === 'text' 
+            ? response.content[0].text 
+            : '';
+
+        // Store interaction
+        await this.memory.add([
+            { role: "user", content: query },
+            { role: "assistant", content: responseText }
+        ], userId, { timestamp: new Date().toISOString() });
+
+        return responseText;
+    }
+}
+
+// Usage
+const chatbot = new SupportChatbot();
+const response = await chatbot.handleCustomerQuery("user123", "I need help with my order");
+```
+
 ### 2. Personal AI Study Buddy
 
 Create an AI tutor that tracks learning progress and adapts to individual needs:
@@ -842,6 +1452,7 @@ def upload_pdf(pdf_url: str, user_id: str):
 
 Build a personalized movie recommender that learns user preferences:
 
+**Python:**
 ```python
 from mem0 import Memory
 from openai import OpenAI
@@ -891,6 +1502,71 @@ def recommend_movie_with_memory(user_id: str, user_query: str):
 
 # Example usage
 recommendation = recommend_movie_with_memory("user123", "I want a sci-fi movie")
+```
+
+**TypeScript:**
+```typescript
+import { Memory } from 'mem0ai/oss';
+import OpenAI from 'openai';
+
+// Configure with local models for privacy
+const memory = new Memory({
+    version: "v1.1",
+    vectorStore: { 
+        provider: "qdrant", 
+        config: { embeddingModelDims: 384 }
+    },
+    llm: {
+        provider: "openai",  // Using OpenAI instead of xAI for TS compatibility
+        config: {
+            apiKey: process.env.OPENAI_API_KEY,
+            model: "gpt-4o",
+            temperature: 0.1,
+            maxTokens: 2000
+        }
+    },
+    embedder: {
+        provider: "huggingface",
+        config: { model: "all-MiniLM-L6-v2" }
+    }
+});
+
+const openai = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY
+});
+
+async function recommendMovieWithMemory(userId: string, userQuery: string): Promise<string> {
+    // Get movie preferences from memory
+    const pastMemories = await memory.search({ 
+        query: "movie preferences", 
+        userId 
+    });
+    
+    let prompt = userQuery;
+    if (pastMemories.results.length > 0) {
+        const preferences = pastMemories.results.map(m => m.memory).join('\n');
+        prompt += `\nUser's movie preferences: ${preferences}`;
+    }
+
+    const response = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [{ role: "user", content: prompt }]
+    });
+    
+    const recommendation = response.choices[0].message.content || '';
+
+    // Store interaction
+    await memory.add([
+        { role: "user", content: userQuery },
+        { role: "assistant", content: recommendation }
+    ], userId);
+
+    return recommendation;
+}
+
+// Example usage
+const recommendation = await recommendMovieWithMemory("user123", "I want a sci-fi movie");
+console.log(recommendation);
 ```
 
 ### 4. Personal Fitness Tracker
@@ -1043,8 +1719,9 @@ answer = assistant.answer_query("What is the remote work policy?", "HR")
 
 ### Test Structure
 
-Mem0 uses pytest for testing. The test suite covers:
+Mem0 uses pytest for Python and Jest for TypeScript testing. The test suite covers:
 
+**Python:**
 ```python
 import pytest
 from mem0 import Memory
@@ -1076,6 +1753,64 @@ def test_memory_operations(memory_store):
     memory_store.delete(memory_id)
     deleted = memory_store.get(memory_id)
     assert deleted is None
+```
+
+**TypeScript:**
+```typescript
+import { Memory } from 'mem0ai/oss';
+import MemoryClient from 'mem0ai';
+
+describe('Memory Operations', () => {
+    let memory: Memory;
+    let client: MemoryClient;
+
+    beforeEach(() => {
+        memory = new Memory();
+        client = new MemoryClient({ apiKey: process.env.MEM0_API_KEY });
+    });
+
+    test('should add and retrieve memories', async () => {
+        // Test OSS memory operations
+        const messages = [{ role: "user" as const, content: "I like pizza" }];
+        const result = await memory.add(messages, "test_user");
+        expect(result).toBeDefined();
+        expect(result.length).toBeGreaterThan(0);
+
+        // Test searching memories
+        const memories = await memory.search({ 
+            query: "food preferences", 
+            userId: "test_user" 
+        });
+        expect(memories.results.length).toBeGreaterThan(0);
+    });
+
+    test('should handle client operations', async () => {
+        // Test platform client
+        const messages = [{ role: "user" as const, content: "I enjoy hiking" }];
+        await client.add(messages, { user_id: "test_user" });
+
+        const memories = await client.search("outdoor activities", { 
+            user_id: "test_user" 
+        });
+        expect(memories.results).toBeDefined();
+    });
+
+    test('should update and delete memories', async () => {
+        // Add memory
+        const messages = [{ role: "user" as const, content: "I like cats" }];
+        const result = await memory.add(messages, "test_user");
+        const memoryId = result[0].id;
+
+        // Update memory
+        const updated = await memory.update(memoryId, "I love cats and dogs");
+        expect(updated.memory).toContain("dogs");
+
+        // Delete memory
+        await memory.delete(memoryId);
+        const deleted = await memory.get(memoryId);
+        expect(deleted).toBeNull();
+    });
+});
 ```
 
 ### Testing Integrations
@@ -1114,6 +1849,7 @@ class TestMemoryIntegrations:
 
 ### Running Tests
 
+**Python:**
 ```bash
 # Install dependencies
 pip install pytest pytest-mock
@@ -1129,6 +1865,32 @@ pytest --cov=mem0 tests/
 
 # Run async tests
 pytest -k "async" tests/
+```
+
+**TypeScript:**
+```bash
+# Install dependencies
+npm install --save-dev jest @types/jest ts-jest
+
+# Run all tests
+npm test
+
+# Run specific test file
+npm test -- memory.test.ts
+
+# Run tests in watch mode
+npm test -- --watch
+
+# Run tests with coverage
+npm test -- --coverage
+
+# For OSS package specifically
+cd mem0-ts
+npm run test
+
+# For Vercel AI SDK package
+cd vercel-ai-sdk
+npm run test
 ```
 
 ## OpenMemory API

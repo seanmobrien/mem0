@@ -140,7 +140,7 @@ def get_default_configuration():
             "api_version": "2025-04-01-preview",
             "azure_endpoint": "https://schoollaw-1000-eastus096943908820.openai.azure.com/"
           },
-          "custom_prompt": "Please focus extraction on people, statements, and actions that could have relevance within the context of investigations into educational malfeanse or record cover-up"
+          "custom_prompt": "Please focus extraction on people, statements, and actions that could have relevance within the context of investigations into educational malfeasance or record cover-up"
         }
       },
       "enable_graph": True

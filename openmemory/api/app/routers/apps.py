@@ -1,11 +1,12 @@
 from typing import Optional
+import datetime
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func, desc
 
 from app.database import get_db
-from app.models import App, Memory, MemoryAccessLog, MemoryState
+from app.models import User, App, Memory, MemoryAccessLog, MemoryState
 
 router = APIRouter(prefix="/api/v1/apps", tags=["apps"])
 
@@ -221,3 +222,37 @@ async def update_app_details(
     app.is_active = is_active
     db.commit()
     return {"status": "success", "message": "Updated app details successfully"}
+
+@router.post("/")
+async def create_app(
+    name: str,
+    owner: str,
+    is_active: bool = True,
+    db: Session = Depends(get_db)
+):
+    # Validate input
+    if not name:
+        raise HTTPException(status_code=400, detail="App name cannot be empty")
+    if not owner:
+        raise HTTPException(status_code=400, detail="Owner cannot be empty")
+    # Check if user exists
+    user = db.query(User).filter(User.name == owner or User.id == owner).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Owner not found")
+    # Check if app with this name already exists
+    existing_app = db.query(App).filter(App.name == name).first()
+    if existing_app:
+        raise HTTPException(status_code=400, detail="App with this name already exists")
+
+    new_app = App(
+        name=name, 
+        is_active=is_active,
+        owner_id=owner,
+        created_at=datetime.datetime.now(datetime.UTC),
+        updated_at=datetime.datetime.now(datetime.UTC),
+    )
+    db.add(new_app)
+    db.commit()
+    db.refresh(new_app)
+
+    return {"status": "success", "message": "App created successfully", "app_id": new_app.id, "data": new_app }

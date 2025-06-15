@@ -1,0 +1,3 @@
+
+GET http://localhost:8000/api/v1/stats/health-check?strict=true
+content-type: application/json

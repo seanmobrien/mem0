@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
+import logging
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import User, Memory, App, MemoryState
@@ -101,6 +102,10 @@ async def health_check(strict: bool = True, db: Optional[Session] = Depends(get_
             }
         )
     
+    import logging
+    logger = logging.getLogger(__name__)
+    for error in errors:
+        logger.error(error)
     return {"status": "ok", "message": "API is running smoothly.", "details": {
         "client_active": client_active,
         "system_db_available": system_db_available,
@@ -108,5 +113,5 @@ async def health_check(strict: bool = True, db: Optional[Session] = Depends(get_
         "graph_store_available": graph_store_available,
         "history_store_available": history_store_available,
         "graph_enabled": graph_enabled,
-        "errors": errors
+        "errors": ["Some errors occurred. Please contact support."]
     }}

@@ -56,7 +56,19 @@ export async function GET(req: NextRequest) {
         recordCount: records
       } : {}),
     }, { status, headers: { 'Content-Type': 'application/json' } });    
+  }
+  catch (error) {
+    console.error('Error in status route:', error);
+    return NextResponse.json({
+      systemAvailable: false,
+      messages: ['An unexpected error occurred while checking the database status.'],
+    }, { status: 500, headers: { 'Content-Type': 'application/json' } });
   } finally {
-    closeDb();
+    try{
+      await closeDb();
+    }catch(closeError) {
+      console.error('Error closing database connection:', closeError);
+    }
+    console.log('Database connection closed after status check.');
   }
 }

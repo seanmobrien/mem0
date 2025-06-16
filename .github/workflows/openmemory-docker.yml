@@ -8,6 +8,7 @@ on:
     paths:
       - 'openmemory/**'
       - 'server/**'
+      - 'pgvector/**'
   #pull_request:
   #  paths:
   #    - 'openmemory/**'
@@ -34,7 +35,7 @@ jobs:
         with:
           filters: |
             openmemory:
-              - '{openmemory,server}/**'
+              - '{openmemory,server,pgvector}/**'
 
   build-and-push:
     needs: check_changes
@@ -59,6 +60,10 @@ jobs:
             dockerfile: server/Dockerfile
             context: server
             image: openmemory-mem0
+          - service: storage
+            dockerfile: pgvector/Dockerfile
+            context: pgvector
+            image: mem0-storage
 
     steps:
       - name: Checkout repository

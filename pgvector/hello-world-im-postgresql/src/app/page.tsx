@@ -9,76 +9,51 @@ export default function Home() {
     systemAvailable: boolean;
     tablesAvailable?: boolean;
     recordCount?: number;
-    message?: string;
+    messages?: string[]  ;
   } | null>(null);
+  const [inError, setInError] = useState(false);
 
   useEffect(() => {
     let timeoutId: NodeJS.Timeout;
     const abortController = new AbortController();
 
-    const fetchStatus = async () => {
-      try {
-        const response = await fetch("/api/status", { signal: abortController.signal });
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
+    const periodicFetch = async () => {
+      const fetchStatus = async () => {
+        let data;
+        try {
+          const response = await fetch("/api/status", { signal: abortController.signal });
+          data = await response.json();
+          setLastResult(data);                    
+        } catch (error) {
+          console.error("Error fetching status:", error);
+          setLastResult(data = {
+            systemAvailable: false,
+            messages: ["Failed to fetch status"],
+          });
         }
-        const data = await response.json();
-        setLastResult({
-          systemAvailable: data.systemAvailable,
-          tablesAvailable: data.tablesAvailable,
-          recordCount: data.recordCount,
-          message: data.message,
-        });
-      } catch (error) {
-        console.error("Error fetching status:", error);
-        setLastResult({
-          systemAvailable: false,
-          message: "Failed to fetch status",
-        });
-      } finally {
-        timeoutId = setTimeout(fetchStatus, refreshInterval);
-      }
+        const isResultFailure = !data?.systemAvailable || data?.tablesAvailable === false || (data?.recordCount ?? 1) <= 0;
+        if (isResultFailure != inError) {
+          setInError(isResultFailure);
+        }
+      };
+      await fetchStatus();
+      timeoutId = setTimeout(periodicFetch, refreshInterval);
     };
 
-    fetchStatus();
+    periodicFetch();
 
     return () => {
       clearTimeout(timeoutId);
       abortController.abort();
     };
-  }, [refreshInterval]);
+  }, [refreshInterval, inError]);
 
-  const handleRefreshNow = () => {
-    setLastResult(null); // Clear last result before manual refresh
-    const abortController = new AbortController();
-    fetch("/api/status", { signal: abortController.signal })
-      .then((response) => {
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        return response.json();
-      })
-      .then((data) => {
-        setLastResult({
-          systemAvailable: data.systemAvailable,
-          tablesAvailable: data.tablesAvailable,
-          recordCount: data.recordCount,
-          message: data.message,
-        });
-      })
-      .catch((error) => {
-        console.error("Error fetching status:", error);
-        setLastResult({
-          systemAvailable: false,
-          message: "Failed to fetch status",
-        });
-      });
-  };
-
+  const statusColor = inError ? "red" : "green";
   return (
     <div className={styles.page}>
       <main className={styles.main}>
         <div>
+          <h1 style={{'textAlign': 'center', 'width': '100%', paddingBottom: '1.2em'}}>Postgresql Dependency Status</h1>
           <label htmlFor="refresh-rate">Refresh Rate:</label>
           <select
             id="refresh-rate"
@@ -92,15 +67,21 @@ export default function Home() {
             <option value={1000 * 60 * 10}>10 minutes</option>
           </select>
         </div>
-        <button onClick={handleRefreshNow}>Refresh Now</button>
+        <button onClick={() => window.location.reload()}>Refresh Now</button>
         <div>
-          <h2>Status Check Result:</h2>
+          <h2 style={{paddingBottom: "1.1em"}}>Status Check Result:</h2>
           {lastResult ? (
-            <ul>
+            <ul style={{ listStyleType: "none", padding: 0, color: statusColor }}>
               <li>System Available: {lastResult.systemAvailable ? "Yes" : "No"}</li>
               <li>Tables Available: {lastResult.tablesAvailable ? "Yes" : "No"}</li>
-              <li>Record Count: {lastResult.recordCount ?? "N/A"}</li>
-              <li>Message: {lastResult.message ?? "No message"}</li>
+              {typeof lastResult.recordCount === 'number' && (<li>Record Count: {lastResult.recordCount}</li>)}
+                  {Array.isArray(lastResult.messages) && lastResult.messages.length > 0 && (
+                    <li >
+                    <ul style={{ listStyleType: "none", paddingLeft: "1.2em" }}>
+                      {lastResult.messages.map((msg, index) => <li key={index}>{msg}</li>)}
+                    </ul>
+                    </li>
+                  )}                 
             </ul>
           ) : (
             <p>No status available yet.</p>

@@ -11,11 +11,14 @@
 
 # Ignore runtime data
 **/node_modules
+node_modules
 **/__pycache__
 **/.pytest_cache
 **/.coverage
 **/coverage
+.next
 **/.next
+hello-world-im-postgresql/.next/**
 
 # Ignore Docker runtime files
 **/.dockerignore

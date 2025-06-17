@@ -60,6 +60,7 @@ sse = SseServerTransport("/mcp/messages/")
 
 @mcp.tool(description="Add a new memory. This method is called everytime the user informs anything about themselves, their preferences, or anything that has any relevant information which can be useful in the future conversation. This can also be called when the user asks you to remember something.")
 async def add_memories(text: str) -> str:
+    logging.info("Add Memory called with text: %s", text)
     uid = user_id_var.get(None)
     client_name = client_name_var.get(None)
 
@@ -144,6 +145,7 @@ async def add_memories(text: str) -> str:
 
 @mcp.tool(description="Peforms a vector Search through stored memories. This method is called EVERYTIME the user asks anything.  Supports pagination if more context is necessary, but pay attention to the result score.")
 async def search_memory(query: str, numberOfHits = 10, page = 1) -> str:
+    logging.info("Search Memory called with query: %s", query)
     uid = user_id_var.get(None)
     client_name = client_name_var.get(None)
     if not uid:
@@ -249,9 +251,9 @@ async def search_memory(query: str, numberOfHits = 10, page = 1) -> str:
         logging.exception(e)
         return f"Error searching memory: {e}"
 
-
 @mcp.tool(description="List all memories in the user's memory")
 async def list_memories() -> str:
+    logging.info("List Memories called")
     uid = user_id_var.get(None)
     client_name = client_name_var.get(None)
     if not uid:
@@ -321,6 +323,7 @@ async def list_memories() -> str:
 
 @mcp.tool(description="Delete all memories in the user's memory")
 async def delete_all_memories() -> str:
+    logging.warning("Delete All Memories called")
     uid = user_id_var.get(None)
     client_name = client_name_var.get(None)
     if not uid:
@@ -417,7 +420,7 @@ async def handle_get_message(request: Request):
 
 
 @mcp_router.post("/{client_name}/sse/{user_id}/messages/")
-async def handle_post_message(request: Request):
+async def handle_post_message_route(request: Request):
     return await handle_post_message(request)
 
 async def handle_post_message(request: Request):

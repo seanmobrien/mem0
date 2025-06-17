@@ -186,6 +186,7 @@ def get_default_memory_config():
             },
         } ,      
         "enable_graph_store": True,
+        "history_db_path": "env:MEMORY_HISTORY_DB_PATH",        
         "version": "v1.1"
     }
 

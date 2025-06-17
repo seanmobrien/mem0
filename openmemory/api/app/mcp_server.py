@@ -176,11 +176,20 @@ async def search_memory(query: str) -> str:
             filters = qdrant_models.Filter(must=conditions)
             embeddings = memory_client.embedding_model.embed(query, "search")
             
-            hits = memory_client.vector_store.client.query_points(
-                collection_name=memory_client.vector_store.collection_name,
+            #
+            #hits = memory_client.vector_store.client.query_points(
+            #    collection_name=memory_client.vector_store.collection_name,
+            #    query=embeddings,
+            #    query_filter=filters,
+            #    limit=10,
+            #)
+            #
+            hits = memory_client.vector_store.search(
                 query=embeddings,
-                query_filter=filters,
+                filter=filters,
                 limit=10,
+                with_payload=True,
+                with_vectors=False,  # We don't need vectors in the response
             )
 
             # Process search results

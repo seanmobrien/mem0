@@ -63,14 +63,14 @@ async def health_check(strict: bool = True, db: Optional[Session] = Depends(get_
             if mem_client is not None:
                 client_active = True
 
-                config = mem_client["config"]
+                config = mem_client.config
 
                 if config is None:
                     errors.append("Memory client configuration is not available.")
                 else:
-                    vector_store_available = "vector_store" in config and config["vector_store"] is not None
-                    graph_store_available =  "graph_store" in config and config["graph_store"] is not None
-                    graph_enabled = "enable_graph" in config and config["enable_graph"]                                
+                    vector_store_available = config.vector_store is not None
+                    graph_store_available =  config.graph_store is not None
+                    graph_enabled = config.enable_graph == graph_store_available
             else:
                 errors.append("Memory client is not available.")                
         except Exception as e:

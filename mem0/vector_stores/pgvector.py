@@ -123,15 +123,15 @@ class PGVector(VectorStoreBase):
         )
         self.conn.commit()
 
-    def search(self, query, vectors, limit=5, filters=None):
+    def search(self, query, vectors, limit=5, filters=None, pageNumber = 1):
         """
         Search for similar vectors.
 
         Args:
-            query (str): Query.
-            vectors (List[float]): Query vector.
+            query (str): Query - Not really used, this isn't a hybrid search.
+            vectors (List[float]): Query vector - This is where the real money is hiding.
             limit (int, optional): Number of results to return. Defaults to 5.
-            filters (Dict, optional): Filters to apply to the search. Defaults to None.
+            filters (Dict, optional): Filters to apply to the search. Defaults to None.  Currently only supports equality filters on payload fields.
 
         Returns:
             list: Search results.
@@ -145,14 +145,14 @@ class PGVector(VectorStoreBase):
                 filter_params.extend([k, str(v)])
 
         filter_clause = "WHERE " + " AND ".join(filter_conditions) if filter_conditions else ""
-
+        offset_clause = f"OFFSET {(pageNumber - 1) * limit}" if pageNumber > 1 else ""
         self.cur.execute(
             f"""
             SELECT id, vector <=> %s::vector AS distance, payload
             FROM {self.collection_name}
             {filter_clause}
             ORDER BY distance
-            LIMIT %s
+            LIMIT %s {offset_clause}
         """,
             (vectors, *filter_params, limit),
         )

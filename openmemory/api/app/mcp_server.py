@@ -185,12 +185,14 @@ async def search_memory(query: str) -> str:
             #)
             #
             hits = memory_client.vector_store.search(
-                query=embeddings,
+                memory_client.vector_store, # Self - not used.  is this a python thing?
+                query                        
+                embeddings,
+                limit=10
                 filter=filters,
-                limit=10,
-                with_payload=True,
-                with_vectors=False,  # We don't need vectors in the response
+                pageNumber
             )
+			
 
             # Process search results
             memories = hits.points

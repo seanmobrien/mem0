@@ -20,7 +20,7 @@ import json
 from mcp.server.fastmcp import FastMCP
 from mcp.server.sse import SseServerTransport
 from app.utils.memory import get_memory_client
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.routing import APIRouter
 import contextvars
 import os
@@ -187,9 +187,9 @@ async def search_memory(query: str, numberOfHits = 10, page = 1) -> str:
             hits = memory_client.vector_store.search(
                 query,                      # search query, also not actually used
                 embeddings,                 # This is where the real magic is
-                limit=numberOfHits,                   # Limit the number of results   
-                filter=filters,             # Filter to only include memories accessible by the user
-                pageNumber = page                 # And provide for pagination support 
+                numberOfHits,                   # Limit the number of results   
+                filters,             # Filter to only include memories accessible by the user
+                page                 # And provide for pagination support 
             )
 			
 
@@ -443,9 +443,11 @@ async def handle_post_message(request: Request):
         # Clean up context variable
         # client_name_var.reset(client_token)
 
+
 def setup_mcp_server(app: FastAPI):
     """Setup MCP server with the FastAPI application"""
     mcp._mcp_server.name = f"mem0-mcp-server"
 
     # Include MCP router in the FastAPI app
     app.include_router(mcp_router)
+

@@ -186,7 +186,7 @@ async def search_memory(query: str) -> str:
             #
             hits = memory_client.vector_store.search(
                 memory_client.vector_store, # Self - not used.  is this a python thing?
-                query                        
+                query,                        
                 embeddings,
                 limit=10
                 filter=filters,

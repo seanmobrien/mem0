@@ -142,8 +142,8 @@ async def add_memories(text: str) -> str:
         return f"Error adding to memory: {e}"
 
 
-@mcp.tool(description="Search through stored memories. This method is called EVERYTIME the user asks anything.")
-async def search_memory(query: str) -> str:
+@mcp.tool(description="Peformsa n vector Search through stored memories. This method is called EVERYTIME the user asks anything.  Supports pagination if more context is necessary, but pay attention to the result score.")
+async def search_memory(query: str, numberOfHits = 10, page = 1) -> str:
     uid = user_id_var.get(None)
     client_name = client_name_var.get(None)
     if not uid:
@@ -186,11 +186,11 @@ async def search_memory(query: str) -> str:
             #
             hits = memory_client.vector_store.search(
                 memory_client.vector_store, # Self - not used.  is this a python thing?
-                query,                        
-                embeddings,
-                limit=10
-                filter=filters,
-                pageNumber
+                query,                      # search query, also not actually used
+                embeddings,                 # This is where the real magic is
+                limit=numberOfHits,                   # Limit the number of results   
+                filter=filters,             # Filter to only include memories accessible by the user
+                pageNumber = page                 # And provide for pagination support 
             )
 			
 

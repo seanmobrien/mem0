@@ -59,6 +59,7 @@ def get_default_memory_config():
                 "password": "env:NEO4J_PASSWORD",
             },
         },
+        "history_db_path": "env:MEMORY_HISTORY_DB_PATH",        
         "version": "v1.1"
     }
 

@@ -248,8 +248,8 @@ async def create_app(
         name=name, 
         is_active=is_active,
         owner_id=owner,
-        created_at=datetime.datetime.now(datetime.UTC),
-        updated_at=datetime.datetime.now(datetime.UTC),
+        created_at=datetime.datetime.now(datetime.timezone.utc),
+        updated_at=datetime.datetime.now(datetime.timezone.utc),
     )
     db.add(new_app)
     db.commit()

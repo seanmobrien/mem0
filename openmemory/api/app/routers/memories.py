@@ -577,7 +577,7 @@ async def filter_memories(
                 created_at=memory.created_at,
                 state=memory.state.value,
                 app_id=memory.app_id,
-                app_name=memory.app.name if memory.app else None,
+                app_name=memory.app.name if memory.app else "openmemory",
                 categories=[category.name for category in memory.categories],
                 metadata_=memory.metadata_
             )
@@ -635,7 +635,7 @@ async def get_related_memories(
                 created_at=memory.created_at,
                 state=memory.state.value,
                 app_id=memory.app_id,
-                app_name=memory.app.name if memory.app else None,
+                app_name=memory.app.name if memory.app else "openmemory",
                 categories=[category.name for category in memory.categories],
                 metadata_=memory.metadata_
             )

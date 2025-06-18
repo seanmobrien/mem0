@@ -1,12 +1,16 @@
+from app.utils.clientConfigFactory import get_parsed_memory_config
 from fastapi import APIRouter, Depends, HTTPException
-import logging
 from sqlalchemy.orm import Session
+import logging
 from app.database import get_db
 from app.models import User, Memory, App, MemoryState
 from app.utils.memory import get_memory_client
 from typing import Optional
 from fastapi import Depends
+from mem0.utils.factory import VectorStoreFactory
 
+
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1/stats", tags=["stats"])
 
 @router.get("/")
@@ -31,6 +35,22 @@ async def get_profile(
         "apps": apps.all()
     }
 
+
+def safe_get_config():
+    """
+    Helper function to safely get the memory client configuration.
+    Returns an empty dictioary if an error occurs.
+    """
+    try:
+        parsedConfig = get_parsed_memory_config()
+        if isinstance(parsedConfig, dict):
+            return parsedConfig
+        else:
+            raise ValueError("Parsed configuration is not a dictionary.")        
+    except Exception as e:
+        logger.error(f"Error getting memory client config: {e}")        
+        return { "error": str(e) }    
+
 @router.get("/health-check")
 async def health_check(strict: bool = True, db: Optional[Session] = Depends(get_db)): 
     """
@@ -40,12 +60,32 @@ async def health_check(strict: bool = True, db: Optional[Session] = Depends(get_
 
     client_active: bool = False
     vector_store_available: bool = False
+    vector_enabled: bool = False
     graph_store_available: bool = False
     history_store_available: bool = False
     system_db_available: bool = False
     graph_enabled: bool = False
     errors = []
-    
+    config = safe_get_config()
+    if ("error" in config):
+        errors.append(f"Configuration error: {config['error']}")
+        raise HTTPException(
+                status_code=503,
+                detail={
+                    "error": "Service is not fully operational - configuration data not found.",
+                    "code": 503,
+                    "details": {
+                        "config_present": False, 
+                        "client_active": client_active,
+                        "system_db_available": system_db_available,
+                        "vector_store_available": vector_store_available,
+                        "graph_store_available": graph_store_available,
+                        "history_store_available": history_store_available,
+                        "graph_enabled": graph_enabled,
+                        "errors": errors
+                    }
+                }
+            )
     try:
         # Check if system / history database is available        
         if db is not None:
@@ -54,27 +94,62 @@ async def health_check(strict: bool = True, db: Optional[Session] = Depends(get_
                 db.close()
                 system_db_available = True
             except Exception as e:
-                errors.append(f"System Database connection error: {str(e)}")                            
+                logger.error(f"System Database connection error: {str(e)}")
+                system_db_available = False                
+                errors.append(f"System Database connection error")
         else:
+            system_db_available = False
             errors.append("System Database dependency not provided.")            
-
+            
+        vectorProvider = None
+        graphProvider = None
+        # Check if memory client is available
         try:
             mem_client = get_memory_client()
-            if mem_client is not None:
-                client_active = True
-
-                config = mem_client.config
-
-                if config is None:
-                    errors.append("Memory client configuration is not available.")
-                else:
-                    vector_store_available = config.vector_store is not None
-                    graph_store_available =  config.graph_store is not None
-                    graph_enabled = config.enable_graph == graph_store_available
-            else:
+            if mem_client is None:
                 errors.append("Memory client is not available.")                
+            else:
+                client_active = True
+                # If the memory client was able to initialize we can pull what we need from it
+                vectorProvider = mem_client.vector_store if hasattr(mem_client, 'vector_store') else None
+                graphProvider = mem_client.graph if hasattr(mem_client, 'graph') else None
         except Exception as e:
+            logger.error(f"Memory client connection error: {str(e)}")
             errors.append(f"Memory client connection error: {str(e)}")
+
+        # Check if vector store is available
+        if hasattr(config, "vector_store") and config["vector_store"] is not None:
+            try:
+                vs_buffer = config["vector_store"]
+                if isinstance(vs_buffer, dict):
+                    vector_store_section: dict = vs_buffer
+                    provider = vector_store_section.get("provider", None)
+                    if provider is not None:
+                        vector_enabled = True
+                        if vectorProvider is None:                            
+                            vectorConfig = vector_store_section.get("config", {})
+                            vectorProvider = VectorStoreFactory.create(provider, vectorConfig)
+                        vector_store_available = vectorProvider is not None and vectorProvider.conn is not None
+            except Exception as e:
+                logger.error(f"Vector Store connection error: {str(e)}")
+                errors.append(f"Vector Store connection error: {str(e.__cause__)}")
+        
+        # Check if graph store is available
+        if hasattr(config, "graph_store") and config["graph_store"] is not None:
+            try:
+                gs_buffer = config["graph_store"]
+                if isinstance(gs_buffer, dict):
+                    graph_store_section: dict = gs_buffer
+                    provider = graph_store_section.get("provider", None)
+                    if provider is not None:
+                        graph_enabled = True
+                        if graphProvider is None:
+                            from mem0.memory.graph_memory import MemoryGraph
+                            graphProvider = MemoryGraph(config)                        
+                        graph_store_available = graphProvider is not None
+            except Exception as e:
+                logger.error(f"Graph Store connection error: {str(e)}")
+                errors.append(f"Graph Store connection error: {str(e.__cause__)}")        
         
     except Exception as e:
        errors.append(f"Unexpected error during health check: {str(e)}")
@@ -83,8 +158,20 @@ async def health_check(strict: bool = True, db: Optional[Session] = Depends(get_
             db.close()
     # I'm not sure I know the difference between system_db_available and history_store_available
     history_store_available = system_db_available
+    # Determine if we return an overall success or failure
+    isOk = True
+    if not client_active or not system_db_available or not history_store_available:
+        isOk = False
+        errors.append("One or more critical services are not available.")
+    if strict and isOk:
+        if vector_enabled and not vector_store_available:
+            isOk = False
+            errors.append("Vector store is not available.")
+        if graph_enabled and not graph_store_available:
+            isOk = False
+            errors.append("Graph store is not available.")            
 
-    if strict and not (client_active and system_db_available and history_store_available):
+    if not isOk:
         raise HTTPException(
             status_code=503,
             detail={
@@ -93,25 +180,23 @@ async def health_check(strict: bool = True, db: Optional[Session] = Depends(get_
                 "details": {
                     "client_active": client_active,
                     "system_db_available": system_db_available,
+                    "vector_enabled": vector_enabled,
                     "vector_store_available": vector_store_available,
-                    "graph_store_available": graph_store_available,
-                    "history_store_available": history_store_available,
                     "graph_enabled": graph_enabled,
+                    "graph_store_available": graph_store_available,
+                    "history_store_available": history_store_available,                    
                     "errors": errors
                 }
             }
         )
-    
-    import logging
-    logger = logging.getLogger(__name__)
-    for error in errors:
-        logger.error(error)
+    # And send all this data back
     return {"status": "ok", "message": "API is running smoothly.", "details": {
         "client_active": client_active,
         "system_db_available": system_db_available,
+        "vector_enabled": vector_enabled,
         "vector_store_available": vector_store_available,
+        "graph_enabled": graph_enabled,        
         "graph_store_available": graph_store_available,
         "history_store_available": history_store_available,
-        "graph_enabled": graph_enabled,
-        "errors": ["Some errors occurred. Please contact support."]
+        "errors": errors
     }}

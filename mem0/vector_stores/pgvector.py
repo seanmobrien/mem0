@@ -60,6 +60,19 @@ class PGVector(VectorStoreBase):
         if collection_name not in collections:
             self.create_col(embedding_model_dims)
 
+    def _is_extension_installed(self, extension_name):
+        """
+        Check if a PostgreSQL extension is installed.
+
+        Args:
+            extension_name (str): Name of the extension to check.
+
+        Returns:
+            bool: True if the extension is installed, False otherwise.
+        """
+        self.cur.execute("SELECT * FROM pg_extension WHERE extname = %s", (extension_name,))
+        return self.cur.fetchone() is not None
+
     def create_col(self, embedding_model_dims):
         """
         Create a new collection (table in PostgreSQL).
@@ -68,7 +81,10 @@ class PGVector(VectorStoreBase):
         Args:
             embedding_model_dims (int): Dimension of the embedding vector.
         """
-        self.cur.execute("CREATE EXTENSION IF NOT EXISTS vector")
+        if not self._is_extension_installed("vector"):
+            logger.info("Creating vector extension in PostgreSQL...")
+            self.cur.execute("CREATE EXTENSION vector")
+        
         self.cur.execute(
             f"""
             CREATE TABLE IF NOT EXISTS {self.collection_name} (
@@ -82,8 +98,7 @@ class PGVector(VectorStoreBase):
         if self.use_diskann and embedding_model_dims < 2000:
             # Check if vectorscale extension is installed
             # self.cur.execute("SELECT * FROM pg_extension WHERE extname = 'vectorscale'")
-            self.cur.execute("SELECT * FROM pg_extension WHERE extname = 'vectorscale' OR extname = 'pgdiskann'")
-            if self.cur.fetchone():
+            if self._is_extension_installed("vectorscale") or self._is_extension_installed("pg_diskann"):
                 # Create DiskANN index if extension is installed for faster search
                 self.cur.execute(
                     f"""

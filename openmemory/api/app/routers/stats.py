@@ -118,7 +118,7 @@ async def health_check(strict: bool = True, db: Optional[Session] = Depends(get_
             errors.append(f"Memory client connection error: {str(e)}")
 
         # Check if vector store is available
-        if "vector_store" in config:
+        if hasattr(config, "vector_store") and config["vector_store"] is not None:
             try:
                 vs_buffer = config["vector_store"]
                 if isinstance(vs_buffer, dict):
@@ -135,7 +135,7 @@ async def health_check(strict: bool = True, db: Optional[Session] = Depends(get_
                 errors.append(f"Vector Store connection error: {str(e.__cause__)}")
         
         # Check if graph store is available
-        if "graph_store" in config:
+        if hasattr(config, "graph_store") and config["graph_store"] is not None:
             try:
                 gs_buffer = config["graph_store"]
                 if isinstance(gs_buffer, dict):

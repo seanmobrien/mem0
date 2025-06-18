@@ -16,7 +16,7 @@ RUN apk add --no-cache nodejs npm
 
 # Verify Node.js installation
 RUN node -v && npm -v
-RUN npm install -g typescript@latest vercel@latest yarn@latest
+RUN npm install -g yarn@latest
 
 COPY ./hello-world-im-postgresql/package.json ./hello-world-im-postgresql/yarn.lock* ./hello-world-im-postgresql/package-lock.json* ./hello-world-im-postgresql/pnpm-lock.yaml* ./hello-world-im-postgresql/.npmrc* ./
 RUN \
@@ -36,7 +36,7 @@ RUN apk add --no-cache nodejs npm
 
 # Verify Node.js installation
 RUN node -v && npm -v
-RUN npm install -g typescript@latest vercel@latest yarn@latest
+RUN npm install -g typescript@latest yarn@latest
 
 COPY --from=deps /app/node_modules ./node_modules
 COPY ./hello-world-im-postgresql  .

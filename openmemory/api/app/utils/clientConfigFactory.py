@@ -305,7 +305,7 @@ def _get_config_from_database() -> dict | None:
         db = SessionLocal()
         query = text("SELECT value FROM configs WHERE key = :key LIMIT 1")
         result = db.execute(query, {"key": "main"}).fetchone()
-        return json.loads(result[0]) if len(result) > 0 else None
+        return json.loads(result[0]) if not result is None and len(result) > 0 else None
     except Exception as e:
         logger.error(f"Error retrieving configuration from database: {e}")
         return None

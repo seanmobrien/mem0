@@ -30,7 +30,7 @@ def main():
         ]
     )
     result = convert_filter_to_sql(filter_obj)
-    print(f"   Input: Filter with city='London'")
+    print("   Input: Filter with city='London'")
     print(f"   Output: {result}")
     print()
     
@@ -45,7 +45,7 @@ def main():
         ]
     )
     result = convert_filter_to_sql(filter_obj)
-    print(f"   Input: Filter with categories in ['food', 'restaurant', 'cafe']")
+    print("   Input: Filter with categories in ['food', 'restaurant', 'cafe']")
     print(f"   Output: {result}")
     print()
     
@@ -60,7 +60,7 @@ def main():
         ]
     )
     result = convert_filter_to_sql(filter_obj)
-    print(f"   Input: Filter with price between 10 and 100")
+    print("   Input: Filter with price between 10 and 100")
     print(f"   Output: {result}")
     print()
     
@@ -85,7 +85,7 @@ def main():
         ]
     )
     result = convert_filter_to_sql(filter_obj)
-    print(f"   Input: Filter with city='London' AND price<=50 AND status!='inactive'")
+    print("   Input: Filter with city='London' AND price<=50 AND status!='inactive'")
     print(f"   Output: {result}")
     print()
     
@@ -100,7 +100,7 @@ def main():
         ]
     )
     result = convert_filter_to_sql(filter_obj, initial_param_index=5)
-    print(f"   Input: Filter with name='John' starting at parameter index 5")
+    print("   Input: Filter with name='John' starting at parameter index 5")
     print(f"   Output: {result}")
     print()
     

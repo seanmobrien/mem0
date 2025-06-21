@@ -3,6 +3,36 @@ Utility functions to convert Qdrant filter objects to PostgreSQL-compatible WHER
 
 This module provides functionality to convert qdrant_client.http.models.Filter objects
 into PostgreSQL WHERE clauses with parameter binding for JSON field filtering.
+
+Supported Qdrant filter conditions:
+- FieldCondition: Filters on payload fields using match, range, is_empty, is_null, values_count
+- HasIdCondition: Filters on record IDs directly using the 'id' column
+
+Examples:
+    Basic field filtering:
+        filter_obj = models.Filter(
+            must=[models.FieldCondition(key="city", match=models.MatchValue(value="London"))]
+        )
+        result = convert_filter_to_sql(filter_obj)
+        # Returns: {"clause": "payload->>'city' = $1", "params": ["London"]}
+    
+    ID filtering:
+        filter_obj = models.Filter(
+            must=[models.HasIdCondition(has_id=[1, 2, 3])]
+        )
+        result = convert_filter_to_sql(filter_obj)
+        # Returns: {"clause": "id = ANY(ARRAY[$1, $2, $3])", "params": ["1", "2", "3"]}
+    
+    Mixed filtering:
+        filter_obj = models.Filter(
+            must=[
+                models.FieldCondition(key="city", match=models.MatchValue(value="London")),
+                models.HasIdCondition(has_id=[100, 200])
+            ],
+            must_not=[models.HasIdCondition(has_id=[999])]
+        )
+        result = convert_filter_to_sql(filter_obj)
+        # Returns complex SQL combining field and ID filters
 """
 
 from typing import Any, Dict, List, Tuple, Union
@@ -101,12 +131,48 @@ def _process_conditions(
         if not condition:
             continue
             
-        clause, condition_params, param_index = _process_field_condition(condition, param_index)
+        # Check if this is a HasIdCondition
+        if 'has_id' in condition and 'key' not in condition:
+            clause, condition_params, param_index = _process_has_id_condition(condition, param_index)
+        else:
+            clause, condition_params, param_index = _process_field_condition(condition, param_index)
+            
         if clause:
             clauses.append(clause)
             params.extend(condition_params)
     
     return clauses, params, param_index
+
+
+def _process_has_id_condition(
+    condition: Dict[str, Any], 
+    param_index: int
+) -> Tuple[str, List[Any], int]:
+    """
+    Process a HasIdCondition into a SQL clause that checks the 'id' column.
+    
+    Args:
+        condition: HasIdCondition dictionary with 'has_id' key
+        param_index: Current parameter index
+        
+    Returns:
+        Tuple of (clause, params, next_param_index)
+    """
+    has_id_list = condition.get('has_id', [])
+    
+    if not has_id_list:
+        # Empty has_id list means no match
+        return "FALSE", [], param_index
+    
+    # Convert all values to strings for consistency
+    params = [str(id_val) if id_val is not None else None for id_val in has_id_list]
+    
+    # Generate SQL using ANY(ARRAY[...]) for PostgreSQL
+    placeholders = ["%s" for _ in range(len(params))]
+    clause = f"id = ANY(ARRAY[{', '.join(placeholders)}])"
+    param_index += len(params)
+    
+    return clause, params, param_index
 
 
 def _process_field_condition(

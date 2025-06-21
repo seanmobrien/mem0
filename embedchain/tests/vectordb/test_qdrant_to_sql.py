@@ -14,7 +14,7 @@ except ImportError:
     # Create mock models for testing
     models = Mock()
 
-from embedchain.vectordb.qdrant_to_sql import convert_filter_to_sql
+from mem0.utils.qdrant_to_sql import convert_filter_to_sql
 
 
 class TestQdrantToSQL(unittest.TestCase):
@@ -483,6 +483,183 @@ class TestQdrantToSQL(unittest.TestCase):
         
         expected_params = ["London", 10.0, 100.0, "food", "restaurant", 1, "inactive", "high"]
         self.assertEqual(result['params'], expected_params)
+
+    def test_hasid_condition_must(self):
+        """Test HasIdCondition in must context."""
+        filter_obj = models.Filter(
+            must=[models.HasIdCondition(has_id=[1, 2, 3])]
+        )
+        
+        result = convert_filter_to_sql(filter_obj)
+        
+        expected = {
+            'clause': "(id = ANY(ARRAY[$1, $2, $3]))",
+            'params': ["1", "2", "3"]
+        }
+        self.assertEqual(result, expected)
+
+    def test_hasid_condition_must_not(self):
+        """Test HasIdCondition in must_not context."""
+        filter_obj = models.Filter(
+            must_not=[models.HasIdCondition(has_id=[4, 5, 6])]
+        )
+        
+        result = convert_filter_to_sql(filter_obj)
+        
+        expected = {
+            'clause': "NOT (id = ANY(ARRAY[$1, $2, $3]))",
+            'params': ["4", "5", "6"]
+        }
+        self.assertEqual(result, expected)
+
+    def test_hasid_condition_should(self):
+        """Test HasIdCondition in should context."""
+        filter_obj = models.Filter(
+            should=[models.HasIdCondition(has_id=[7, 8, 9])]
+        )
+        
+        result = convert_filter_to_sql(filter_obj)
+        
+        expected = {
+            'clause': "(id = ANY(ARRAY[$1, $2, $3]))",
+            'params': ["7", "8", "9"]
+        }
+        self.assertEqual(result, expected)
+
+    def test_hasid_condition_mixed_with_field_condition(self):
+        """Test HasIdCondition mixed with FieldCondition."""
+        filter_obj = models.Filter(
+            must=[
+                models.FieldCondition(
+                    key="city",
+                    match=models.MatchValue(value="London")
+                ),
+                models.HasIdCondition(has_id=[10, 11, 12])
+            ]
+        )
+        
+        result = convert_filter_to_sql(filter_obj)
+        
+        expected = {
+            'clause': "(payload->>'city' = $1 AND id = ANY(ARRAY[$2, $3, $4]))",
+            'params': ["London", "10", "11", "12"]
+        }
+        self.assertEqual(result, expected)
+
+    def test_hasid_condition_empty_list(self):
+        """Test HasIdCondition with empty has_id list."""
+        filter_obj = models.Filter(
+            must=[models.HasIdCondition(has_id=[])]
+        )
+        
+        result = convert_filter_to_sql(filter_obj)
+        
+        expected = {
+            'clause': "(FALSE)",
+            'params': []
+        }
+        self.assertEqual(result, expected)
+
+    def test_hasid_condition_string_ids(self):
+        """Test HasIdCondition with string IDs."""
+        filter_obj = models.Filter(
+            must=[models.HasIdCondition(has_id=["user-123", "user-456", "user-789"])]
+        )
+        
+        result = convert_filter_to_sql(filter_obj)
+        
+        expected = {
+            'clause': "(id = ANY(ARRAY[$1, $2, $3]))",
+            'params': ["user-123", "user-456", "user-789"]
+        }
+        self.assertEqual(result, expected)
+
+    def test_hasid_condition_single_id(self):
+        """Test HasIdCondition with single ID."""
+        filter_obj = models.Filter(
+            must=[models.HasIdCondition(has_id=[42])]
+        )
+        
+        result = convert_filter_to_sql(filter_obj)
+        
+        expected = {
+            'clause': "(id = ANY(ARRAY[$1]))",
+            'params': ["42"]
+        }
+        self.assertEqual(result, expected)
+
+    def test_hasid_condition_mixed_string_and_int_ids(self):
+        """Test HasIdCondition with mixed string and int IDs."""
+        filter_obj = models.Filter(
+            must=[models.HasIdCondition(has_id=[1, "abc", 3])]
+        )
+        
+        result = convert_filter_to_sql(filter_obj)
+        
+        expected = {
+            'clause': "(id = ANY(ARRAY[$1, $2, $3]))",
+            'params': ["1", "abc", "3"]
+        }
+        self.assertEqual(result, expected)
+
+    def test_complex_filter_with_hasid_condition(self):
+        """Test complex filter combining all condition types including HasIdCondition."""
+        filter_obj = models.Filter(
+            must=[
+                models.FieldCondition(
+                    key="city",
+                    match=models.MatchValue(value="London")
+                ),
+                models.HasIdCondition(has_id=[100, 200])
+            ],
+            must_not=[
+                models.FieldCondition(
+                    key="status",
+                    match=models.MatchValue(value="inactive")
+                ),
+                models.HasIdCondition(has_id=[999])
+            ],
+            should=[
+                models.FieldCondition(
+                    key="priority",
+                    match=models.MatchValue(value="high")
+                ),
+                models.HasIdCondition(has_id=[300, 400])
+            ]
+        )
+        
+        result = convert_filter_to_sql(filter_obj)
+        
+        # Check that all parts are present in the clause
+        self.assertIn("payload->>'city' = $1", result['clause'])
+        self.assertIn("id = ANY(ARRAY[$2, $3])", result['clause'])
+        self.assertIn("NOT (payload->>'status' = $4 OR id = ANY(ARRAY[$5]))", result['clause'])
+        self.assertIn("(payload->>'priority' = $6 OR id = ANY(ARRAY[$7, $8]))", result['clause'])
+        
+        expected_params = ["London", "100", "200", "inactive", "999", "high", "300", "400"]
+        self.assertEqual(result['params'], expected_params)
+        
+        # Verify structure: should have 3 main clause groups (must, must_not, should)
+        # The clause format is: (must_clauses) AND NOT (must_not_clauses) AND (should_clauses)
+        expected_clause = "(payload->>'city' = $1 AND id = ANY(ARRAY[$2, $3])) AND NOT (payload->>'status' = $4 OR id = ANY(ARRAY[$5])) AND (payload->>'priority' = $6 OR id = ANY(ARRAY[$7, $8]))"
+        self.assertEqual(result['clause'], expected_clause)
+
+    def test_multiple_hasid_conditions_must_not(self):
+        """Test multiple HasIdCondition in must_not context."""
+        filter_obj = models.Filter(
+            must_not=[
+                models.HasIdCondition(has_id=[1, 2]),
+                models.HasIdCondition(has_id=[3, 4])
+            ]
+        )
+        
+        result = convert_filter_to_sql(filter_obj)
+        
+        expected = {
+            'clause': "NOT (id = ANY(ARRAY[$1, $2]) OR id = ANY(ARRAY[$3, $4]))",
+            'params': ["1", "2", "3", "4"]
+        }
+        self.assertEqual(result, expected)
 
 
 if __name__ == '__main__':

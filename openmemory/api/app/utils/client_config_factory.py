@@ -313,6 +313,22 @@ def _get_config_from_database() -> dict | None:
         if db is not None:
             db.close()
 
+
+def _copy_from_db(target: dict, db: dict, key: str):
+    """
+    Copies a value from the database dictionary to the target dictionary
+    if the key exists in the database.
+    """
+    if key in db and db[key] is not None:
+        if target.get(key) is None:
+            # If the target key does not exist, copy it right on over from the database
+            target[key] = db[key]
+        elif isinstance(target[key], dict) and isinstance(db[key], dict):
+            # If both are dictionaries, merge them
+            target[key].update(db[key])        
+    else:
+        logger.debug(f"Warning: Key '{key}' not found in database configuration, using default value."    )
+
 def get_parsed_memory_config(custom_instructions: str | None = None, expandSecrets: bool = True): 
     "Retrieves and parses memory client configuration from the database, or"
     "sensable deafults if not available."    
@@ -321,41 +337,28 @@ def get_parsed_memory_config(custom_instructions: str | None = None, expandSecre
     try:        
         # Start with default configuration
         config = get_default_memory_config(expandSecrets)
-        
-        # Variable to track custom instructions
-        db_custom_instructions = None        
+                      
         # Use custom_instructions parameter first, then fall back to database value
-        instructions_to_use = custom_instructions or db_custom_instructions
+        instructions_to_use = custom_instructions
         if instructions_to_use is not None:
-            config["custom_fact_extraction_prompt"] = instructions_to_use
-
+            config.update({"custom_fact_extraction_prompt": instructions_to_use})
+        
         # Load configuration from database
         json_config = _get_config_from_database()
 
         if json_config:                    
             # Extract custom instructions from openmemory settings
-            if "openmemory" in json_config and "custom_instructions" in json_config["openmemory"]:
+            if "openmemory" in json_config and "custom_instructions" in json_config["openmemory"] and custom_instructions is None:
                 config["custom_fact_extraction_prompt"] = json_config["openmemory"]["custom_instructions"]
             
             # Override defaults with configurations from the database
             if "mem0" in json_config:
-                mem0_config = json_config["mem0"]
-                
-                # Update LLM configuration if available
-                if "llm" in mem0_config and mem0_config["llm"] is not None:
-                    config["llm"] = mem0_config["llm"]                                        
-                
-                # Update Embedder configuration if available
-                if "embedder" in mem0_config and mem0_config["embedder"] is not None:
-                    config["embedder"] = mem0_config["embedder"]
-                
-                # Update Vector Store configuration if available
-                if "vector_store" in mem0_config and mem0_config["vector_store"] is not None:
-                    config["vector_store"] = mem0_config["vector_store"]
-                
-                # Update Graph Store configuration if available
-                if "graph_store" in mem0_config and mem0_config["graph_store"] is not None:
-                    config["graph_store"] = mem0_config["graph_store"]
+                mem0_config = json_config["mem0"]                
+                # Update configuration sections where available
+                _copy_from_db(config, mem0_config, "llm")
+                _copy_from_db(config, mem0_config, "embedder")
+                _copy_from_db(config, mem0_config, "vector_store")
+                _copy_from_db(config, mem0_config, "graph_store")                
             
             # All done!
             logger.info("Configuration data has been successfully merged.")
@@ -368,14 +371,12 @@ def get_parsed_memory_config(custom_instructions: str | None = None, expandSecre
         if config["embedder"].get("provider") == "ollama":            
             config["embedder"] = fix_ollama_urls(config["embedder"])            
         
-        # ALWAYS parse environment variables in the final config
-        # This ensures that even default config values like "env:OPENAI_API_KEY" get parsed
-        # NOTE: I'm not sure I love this?  It means we need to be super careful with what we do with 
-        # the config object to be sure we don't accidentally leak secrets.  It may be better to do on-demand,
-        # if only for sensitive values.        
-        parsedConfig: Any = parse_environment_variables(config, expandSecrets = expandSecrets)
-        if isinstance(parsedConfig, dict):
-            config = parsedConfig        
+        # If expandSecrets is false then we don't want to mess with environment variables
+        # This supports loading and saving configuration source vs. resolved values
+        if (expandSecrets):
+            parsedConfig: Any = parse_environment_variables(config, expandSecrets)
+            if isinstance(parsedConfig, dict):
+                config = parsedConfig        
         return config
     except Exception as e:
         logger.warning(f"Warning: Error loading configuration from database: {e}; default configuration will be used.")        

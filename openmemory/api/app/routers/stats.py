@@ -1,4 +1,4 @@
-from app.utils.clientConfigFactory import get_parsed_memory_config
+from openmemory.api.app.utils.client_config_factory import get_parsed_memory_config
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 import logging
@@ -39,7 +39,7 @@ async def get_profile(
 def safe_get_config():
     """
     Helper function to safely get the memory client configuration.
-    Returns an empty dictioary if an error occurs.
+    Returns an empty dictionary if an error occurs.
     """
     try:
         parsedConfig = get_parsed_memory_config()
@@ -50,6 +50,17 @@ def safe_get_config():
     except Exception as e:
         logger.error(f"Error getting memory client config: {e}")        
         return { "error": str(e) }    
+
+def _safe_check_config(config: dict, key: str) -> bool:
+    """
+    Helper function to safely check if a key exists in the configuration.
+    Returns False if the key does not exist or if an error occurs.
+    """
+    try:
+        return key in config and config[key] is not None
+    except Exception as e:        
+        return False
+    
 
 @router.get("/health-check")
 async def health_check(strict: bool = True, db: Optional[Session] = Depends(get_db)): 
@@ -118,7 +129,7 @@ async def health_check(strict: bool = True, db: Optional[Session] = Depends(get_
             errors.append(f"Memory client connection error: {str(e)}")
 
         # Check if vector store is available
-        if hasattr(config, "vector_store") and config["vector_store"] is not None:
+        if _safe_check_config(config, "vector_store"):
             try:
                 vs_buffer = config["vector_store"]
                 if isinstance(vs_buffer, dict):
@@ -135,7 +146,7 @@ async def health_check(strict: bool = True, db: Optional[Session] = Depends(get_
                 errors.append(f"Vector Store connection error: {str(e.__cause__)}")
         
         # Check if graph store is available
-        if hasattr(config, "graph_store") and config["graph_store"] is not None:
+        if _safe_check_config(config, "graph_store"):
             try:
                 gs_buffer = config["graph_store"]
                 if isinstance(gs_buffer, dict):

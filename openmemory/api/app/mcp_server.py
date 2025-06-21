@@ -196,7 +196,7 @@ async def search_memory(query: str, numberOfHits = 10, page = 1) -> str:
 			
 
             # Process search results
-            memories = hits.points
+            memories = hits
             memories = [
                 {
                     "id": memory.id,

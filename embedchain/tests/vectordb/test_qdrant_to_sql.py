@@ -236,7 +236,7 @@ class TestQdrantToSQL(unittest.TestCase):
             ]
         )
         
-        result = convert_filter_to_sql(filter_obj, initial_param_index=5)
+        result = convert_filter_to_sql(filter_obj)
         
         expected = {
             'clause': "(payload->>'city' = %s)",

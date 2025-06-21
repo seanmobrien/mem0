@@ -20,7 +20,7 @@ import json
 from mcp.server.fastmcp import FastMCP
 from mcp.server.sse import SseServerTransport
 from app.utils.memory import get_memory_client
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.routing import APIRouter
 import contextvars
 import os
@@ -60,6 +60,7 @@ sse = SseServerTransport("/mcp/messages/")
 
 @mcp.tool(description="Add a new memory. This method is called everytime the user informs anything about themselves, their preferences, or anything that has any relevant information which can be useful in the future conversation. This can also be called when the user asks you to remember something.")
 async def add_memories(text: str) -> str:
+    logging.info("Add Memory called with text: %s", text)
     uid = user_id_var.get(None)
     client_name = client_name_var.get(None)
 
@@ -142,8 +143,9 @@ async def add_memories(text: str) -> str:
         return f"Error adding to memory: {e}"
 
 
-@mcp.tool(description="Search through stored memories. This method is called EVERYTIME the user asks anything.")
-async def search_memory(query: str) -> str:
+@mcp.tool(description="Peforms a vector Search through stored memories. This method is called EVERYTIME the user asks anything.  Supports pagination if more context is necessary, but pay attention to the result score.")
+async def search_memory(query: str, numberOfHits = 10, page = 1) -> str:
+    logging.info("Search Memory called with query: %s", query)
     uid = user_id_var.get(None)
     client_name = client_name_var.get(None)
     if not uid:
@@ -176,15 +178,25 @@ async def search_memory(query: str) -> str:
             filters = qdrant_models.Filter(must=conditions)
             embeddings = memory_client.embedding_model.embed(query, "search")
             
-            hits = memory_client.vector_store.client.query_points(
-                collection_name=memory_client.vector_store.collection_name,
-                query=embeddings,
-                query_filter=filters,
-                limit=10,
+            #
+            #hits = memory_client.vector_store.client.query_points(
+            #    collection_name=memory_client.vector_store.collection_name,
+            #    query=embeddings,
+            #    query_filter=filters,
+            #    limit=10,
+            #)
+            #
+            hits = memory_client.vector_store.search(
+                query,                      # search query, also not actually used
+                embeddings,                 # This is where the real magic is
+                numberOfHits,                   # Limit the number of results   
+                filters,             # Filter to only include memories accessible by the user
+                page                 # And provide for pagination support 
             )
+			
 
             # Process search results
-            memories = hits.points
+            memories = hits
             memories = [
                 {
                     "id": memory.id,
@@ -239,9 +251,9 @@ async def search_memory(query: str) -> str:
         logging.exception(e)
         return f"Error searching memory: {e}"
 
-
 @mcp.tool(description="List all memories in the user's memory")
 async def list_memories() -> str:
+    logging.info("List Memories called")
     uid = user_id_var.get(None)
     client_name = client_name_var.get(None)
     if not uid:
@@ -311,6 +323,7 @@ async def list_memories() -> str:
 
 @mcp.tool(description="Delete all memories in the user's memory")
 async def delete_all_memories() -> str:
+    logging.warning("Delete All Memories called")
     uid = user_id_var.get(None)
     client_name = client_name_var.get(None)
     if not uid:
@@ -407,7 +420,7 @@ async def handle_get_message(request: Request):
 
 
 @mcp_router.post("/{client_name}/sse/{user_id}/messages/")
-async def handle_post_message(request: Request):
+async def handle_post_message_route(request: Request):
     return await handle_post_message(request)
 
 async def handle_post_message(request: Request):
@@ -433,9 +446,11 @@ async def handle_post_message(request: Request):
         # Clean up context variable
         # client_name_var.reset(client_token)
 
+
 def setup_mcp_server(app: FastAPI):
     """Setup MCP server with the FastAPI application"""
     mcp._mcp_server.name = f"mem0-mcp-server"
 
     # Include MCP router in the FastAPI app
     app.include_router(mcp_router)
+

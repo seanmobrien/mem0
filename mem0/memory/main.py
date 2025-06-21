@@ -117,7 +117,6 @@ logger = logging.getLogger(__name__)
 class Memory(MemoryBase):
     def __init__(self, config: MemoryConfig = MemoryConfig()):
         self.config = config
-
         self.custom_fact_extraction_prompt = self.config.custom_fact_extraction_prompt
         self.custom_update_memory_prompt = self.config.custom_update_memory_prompt
         self.embedding_model = EmbedderFactory.create(

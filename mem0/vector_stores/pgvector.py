@@ -10,6 +10,7 @@ try:
 except ImportError:
     raise ImportError("The 'psycopg2' library is required. Please install it using 'pip install psycopg2'.")
 
+from mem0.utils.qdrant_to_sql import convert_filter_to_sql
 from mem0.vector_stores.base import VectorStoreBase
 
 logger = logging.getLogger(__name__)
@@ -60,6 +61,19 @@ class PGVector(VectorStoreBase):
         if collection_name not in collections:
             self.create_col(embedding_model_dims)
 
+    def _is_extension_installed(self, extension_name):
+        """
+        Check if a PostgreSQL extension is installed.
+
+        Args:
+            extension_name (str): Name of the extension to check.
+
+        Returns:
+            bool: True if the extension is installed, False otherwise.
+        """
+        self.cur.execute("SELECT * FROM pg_extension WHERE extname = %s", (extension_name,))
+        return self.cur.fetchone() is not None
+
     def create_col(self, embedding_model_dims):
         """
         Create a new collection (table in PostgreSQL).
@@ -68,7 +82,10 @@ class PGVector(VectorStoreBase):
         Args:
             embedding_model_dims (int): Dimension of the embedding vector.
         """
-        self.cur.execute("CREATE EXTENSION IF NOT EXISTS vector")
+        if not self._is_extension_installed("vector"):
+            logger.info("Creating vector extension in PostgreSQL...")
+            self.cur.execute("CREATE EXTENSION vector")
+        
         self.cur.execute(
             f"""
             CREATE TABLE IF NOT EXISTS {self.collection_name} (
@@ -82,8 +99,7 @@ class PGVector(VectorStoreBase):
         if self.use_diskann and embedding_model_dims < 2000:
             # Check if vectorscale extension is installed
             # self.cur.execute("SELECT * FROM pg_extension WHERE extname = 'vectorscale'")
-            self.cur.execute("SELECT * FROM pg_extension WHERE extname = 'vectorscale' OR extname = 'pgdiskann'")
-            if self.cur.fetchone():
+            if self._is_extension_installed("vectorscale") or self._is_extension_installed("pg_diskann"):
                 # Create DiskANN index if extension is installed for faster search
                 self.cur.execute(
                     f"""
@@ -123,15 +139,15 @@ class PGVector(VectorStoreBase):
         )
         self.conn.commit()
 
-    def search(self, query, vectors, limit=5, filters=None):
+    def search(self, query, vectors, limit=5, filters=None, pageNumber = 1):
         """
         Search for similar vectors.
 
         Args:
-            query (str): Query.
-            vectors (List[float]): Query vector.
+            query (str): Query - Not really used, this isn't a hybrid search.
+            vectors (List[float]): Query vector - This is where the real money is hiding.
             limit (int, optional): Number of results to return. Defaults to 5.
-            filters (Dict, optional): Filters to apply to the search. Defaults to None.
+            filters (Dict, optional): Filters to apply to the search. Defaults to None.  Currently only supports equality filters on payload fields.
 
         Returns:
             list: Search results.
@@ -140,19 +156,19 @@ class PGVector(VectorStoreBase):
         filter_params = []
 
         if filters:
-            for k, v in filters.items():
-                filter_conditions.append("payload->>%s = %s")
-                filter_params.extend([k, str(v)])
+            parsed_filters = convert_filter_to_sql(filters)
+            filter_params.extend(parsed_filters['params'])
+            filter_conditions.append(parsed_filters['clause'])
 
         filter_clause = "WHERE " + " AND ".join(filter_conditions) if filter_conditions else ""
-
+        offset_clause = f"OFFSET {(pageNumber - 1) * limit}" if pageNumber > 1 else ""
         self.cur.execute(
             f"""
             SELECT id, vector <=> %s::vector AS distance, payload
             FROM {self.collection_name}
             {filter_clause}
             ORDER BY distance
-            LIMIT %s
+            LIMIT %s {offset_clause}
         """,
             (vectors, *filter_params, limit),
         )
@@ -261,9 +277,8 @@ class PGVector(VectorStoreBase):
         filter_params = []
 
         if filters:
-            for k, v in filters.items():
-                filter_conditions.append("payload->>%s = %s")
-                filter_params.extend([k, str(v)])
+            parsed_filters = convert_filter_to_sql(filters)
+            filter_params.extend(parsed_filters['params'])
 
         filter_clause = "WHERE " + " AND ".join(filter_conditions) if filter_conditions else ""
 

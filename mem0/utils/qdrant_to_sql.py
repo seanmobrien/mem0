@@ -32,7 +32,7 @@ def convert_filter_to_sql(
             must=[models.FieldCondition(key="city", match=models.MatchValue(value="London"))]
         )
         result = convert_filter_to_sql(filter_obj)
-        # Returns: {"clause": "payload->'city' = $1", "params": ["London"]}
+        # Returns: {"clause": "payload->>'city' = $1", "params": ["London"]}
     """
     if not isinstance(qdrant_filter, models.Filter):
         raise TypeError("Expected qdrant_client.http.models.Filter object")
@@ -152,14 +152,14 @@ def _process_match_condition(
     
     if 'value' in match:
         # Single value match
-        clause = f"payload->>'{key}' = ${param_index}"
+        clause = f"payload->>'{key}' = %s"
         params.append(str(match['value']) if match['value'] is not None else None)
         param_index += 1
     elif 'any' in match:
         # Match any of the values
         values = match['any']
         if values:
-            placeholders = [f"${param_index + i}" for i in range(len(values))]
+            placeholders = [f"%s" for i in range(len(values))]
             clause = f"payload->>'{key}' = ANY(ARRAY[{', '.join(placeholders)}])"
             params.extend(str(v) if v is not None else None for v in values)
             param_index += len(values)
@@ -182,22 +182,22 @@ def _process_range_condition(
     
     # Handle different range operators
     if 'gte' in range_condition and range_condition['gte'] is not None:
-        clauses.append(f"(payload->>'{key}')::numeric >= ${param_index}")
+        clauses.append(f"(payload->>'{key}')::numeric >= %s")
         params.append(range_condition['gte'])
         param_index += 1
     
     if 'gt' in range_condition and range_condition['gt'] is not None:
-        clauses.append(f"(payload->>'{key}')::numeric > ${param_index}")
+        clauses.append(f"(payload->>'{key}')::numeric > %s")
         params.append(range_condition['gt'])
         param_index += 1
     
     if 'lte' in range_condition and range_condition['lte'] is not None:
-        clauses.append(f"(payload->>'{key}')::numeric <= ${param_index}")
+        clauses.append(f"(payload->>'{key}')::numeric <= %s")
         params.append(range_condition['lte'])
         param_index += 1
     
     if 'lt' in range_condition and range_condition['lt'] is not None:
-        clauses.append(f"(payload->>'{key}')::numeric < ${param_index}")
+        clauses.append(f"(payload->>'{key}')::numeric < %s")
         params.append(range_condition['lt'])
         param_index += 1
     
@@ -213,10 +213,10 @@ def _process_is_empty_condition(
     """Process is_empty conditions."""
     if is_empty:
         # Check if array is empty or null
-        clause = f"(payload->>'{key}' IS NULL OR jsonb_array_length(payload->'{key}') = 0)"
+        clause = f"(payload->>'{key}' IS NULL OR jsonb_array_length(payload->>'{key}') = 0)"
     else:
         # Check if array is not empty
-        clause = f"(payload->>'{key}' IS NOT NULL AND jsonb_array_length(payload->'{key}') > 0)"
+        clause = f"(payload->>'{key}' IS NOT NULL AND jsonb_array_length(payload->>'{key}') > 0)"
     
     return clause, [], param_index
 
@@ -245,22 +245,22 @@ def _process_values_count_condition(
     params = []
     
     if 'gte' in values_count and values_count['gte'] is not None:
-        clauses.append(f"jsonb_array_length(payload->'{key}') >= ${param_index}")
+        clauses.append(f"jsonb_array_length(payload->>'{key}') >= %s")
         params.append(values_count['gte'])
         param_index += 1
     
     if 'gt' in values_count and values_count['gt'] is not None:
-        clauses.append(f"jsonb_array_length(payload->'{key}') > ${param_index}")
+        clauses.append(f"jsonb_array_length(payload->>'{key}') > %s")
         params.append(values_count['gt'])
         param_index += 1
     
     if 'lte' in values_count and values_count['lte'] is not None:
-        clauses.append(f"jsonb_array_length(payload->'{key}') <= ${param_index}")
+        clauses.append(f"jsonb_array_length(payload->>'{key}') <= %s")
         params.append(values_count['lte'])
         param_index += 1
     
     if 'lt' in values_count and values_count['lt'] is not None:
-        clauses.append(f"jsonb_array_length(payload->'{key}') < ${param_index}")
+        clauses.append(f"jsonb_array_length(payload->>'{key}') < %s")
         params.append(values_count['lt'])
         param_index += 1
     

@@ -1,6 +1,10 @@
 import os
 import json
 from typing import Dict, Any, Optional
+
+from sqlalchemy import Column
+import sqlalchemy
+from openmemory.api.app.utils.client_config_factory import split_config
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -8,20 +12,27 @@ import logging
 from app.database import get_db
 from app.models import Config as ConfigModel
 from app.utils.memory import reset_memory_client
+#from app.utils.clientConfigFactory import get_default_memory_config, get_parsed_memory_config
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/config", tags=["config"])
 
+class LLMKwargsAzure(BaseModel): 
+    api_key: Optional[str] = None
+    azure_deployment: Optional[str] = None
+    azure_endpoint: Optional[str] = None
+    api_version: Optional[str] = None
+    default_headers: Optional[Dict[str, str]] = None
+    
+                                                      
+
 class LLMConfig(BaseModel):
     model: str = Field(..., description="LLM model name")
-    temperature: Optional[float] = Field(..., description="Temperature setting for the model")
-    max_tokens: Optional[int] = Field(..., description="Maximum tokens to generate")
-    api_key: Optional[str] = Field(..., description="API key or 'env:LLM_AZURE_OPENAI_API_KEY' to use environment variable")    
-    azure_kwargs: Optional[Dict[str, Any]] = Field(
-        default_factory=dict, 
-        description="Azure-specific parameters for the embedder, such as api_key, azure_deployment, azure_endpoint, and api_version"
-    )
+    temperature: Optional[float | str] = None
+    max_tokens: Optional[int| str] = None
+    api_key: Optional[str] = None
+    azure_kwargs: Optional[LLMKwargsAzure] = None
 
 class LLMProvider(BaseModel):
     provider: str = Field(..., description="LLM provider name")
@@ -29,220 +40,122 @@ class LLMProvider(BaseModel):
 
 class EmbedderConfig(BaseModel):
     model: str = Field(..., description="Embedder model name")
-    azure_kwargs: Optional[Dict[str, Any]] = Field(
-        default_factory=dict, 
-        description="Azure-specific parameters for the embedder, such as api_key, azure_deployment, azure_endpoint, and api_version"
-    )
+    azure_kwargs: Optional[LLMKwargsAzure] = None
     
 class EmbedderProvider(BaseModel):
     provider: str = Field(..., description="Embedder provider name")
-    config: EmbedderConfig
+    config: EmbedderConfig = Field(..., description="Configuration for the embedder provider")
 
 class OpenMemoryConfig(BaseModel):
     custom_instructions: Optional[str] = Field(..., description="Custom instructions for memory management and fact extraction")
 
-class VectorProvider(BaseModel):
-    host: Optional[str] = Field(..., description="Host for the vector store")
-    port: Optional[int] = Field(..., description="Port for the vector store")
-    dbname: Optional[str] = Field(..., description="Database name for the vector store")
-    user: Optional[str] = Field(..., description="User for the vector store")
-    password: Optional[str] = Field(..., description="Password for the vector store")
-    collection_name: Optional[str] = Field(..., description="Collection name for the vector store")    
-    embedding_model_dim: Optional[int] = Field(..., description="Embedding model dimension for the vector store")
-    hnsw: Optional[bool] = Field( ..., description="If HNSW indexing is available, defaults to True")
-    diskann: Optional[bool] = Field(..., description="If Diskman algorithm is available, defaults to False")
-
 class VectorStoreConfig(BaseModel):
     provider: str = Field(..., description="Vector store provider name")
-    config: VectorProvider
+    config: Optional[Dict[str, Any]] = Field(
+        default_factory=dict, 
+        description="Settings used to configure the vector store"
+    )
 
-class GraphProvider(BaseModel):
-    url: Optional[str] = Field(..., description="URL for the graph store")
-    username: Optional[str] = Field(..., description="Username for the graph store")
-    password: Optional[str] = Field(..., description="Password for the graph store")
-    # llm: Optional[LLMConfig] = Field(..., description="LLM configuration for querying the graph store")
-    # custom_prompt: Optional[str] = Field(..., description="Custom prompt to fetch entities from the given text")
-    
 class GraphStoreConfig(BaseModel):
     provider: str = Field(..., description="Graph store provider name")
-    config: GraphProvider
+    config: Optional[Dict[str, Any]] = Field(
+        default_factory=dict, 
+        description="Settings used to configure the graph store"
+    )
 
 class Mem0Config(BaseModel):
     llm: Optional[LLMProvider] = None
     embedder: Optional[EmbedderProvider] = None
     vector_store: Optional[VectorStoreConfig] = None
     graph_store: Optional[GraphStoreConfig] = None
-    enable_graph: Optional[bool] = Field(..., description="If True, enables the graph store for advanced querying and relationships")
-    version: Optional[str] = Field(..., description="Version of the Mem0 configuration, defaults to 'v1'")
+    enable_graph: Optional[bool] = None
+    version: Optional[str] = None
 
 class ConfigSchema(BaseModel):
     openmemory: Optional[OpenMemoryConfig] = None
     mem0: Optional[Mem0Config] = None
 
-def get_default_configuration():
-    """Get the default configuration with sensible defaults for LLM and embedder."""
-    return {
-    "openmemory": {
-      "custom_instructions": None
-    },
-    "mem0": {
-      "llm": {
-        "provider": "azure_openai",
-        "config": {
-          "model": "gpt-4o-mini",
-          "temperature": 0.1,
-          "max_tokens": 2000,
-          "api_key": "env:OPENAI_API_KEY",
-          "azure_deployment": "gpt-4o-mini",
-          "api_version": "2025-04-01-preview",
-          "azure_endpoint": "https://schoollaw-1000-eastus096943908820.openai.azure.com/"
-        }
-      },
-      "embedder": {
-        "provider": "azure_openai",
-        "config": {
-          "model": "text-embedding-3-small",          
-          "azure_kwargs": {
-            "api_key": "env:OPENAI_API_KEY",
-            "azure_deployment": "text-embedding-3-small",
-            "azure_endpoint": "https://schoollawbot1000.openai.azure.com/",
-            "api_version": "2025-04-01-preview"    
-          }          
-        }
-      },
-      "vector_store": {
-        "provider": "pgvector",
-        "config": {
-          "host": "env:PGVECTOR_HOST",
-          "port": 8432,
-          "dbname": "env:PGVECTOR_DB",
-          "user": "env:PGVECTOR_USER",
-          "password": "env:PGVECTOR_PASSWORD",
-          "collectionName": "env:PGVECTOR_COLLECTION_NAME",
-          "dimension": 1536,
-          "embeddingModelDims": 1536,
-          "hnsw": True,
-          "diskMan": False
-        }
-      },
-      "graph_store": {
-        "provider": "neo4j",
-        "config": {
-          "url": "env:NEO4J_URI",
-          "username": "env:NEO4J_USERNAME",
-          "password": "env:NEO4J_PASSWORD",
-          "llm": {
-            "model": "gpt-4o-mini",
-            "temperature": 0.1,
-            "max_tokens": 2000,
-            "api_key": "env:OPENAI_API_KEY",
-            "azure_deployment": "gpt-4o-mini",
-            "api_version": "2025-04-01-preview",
-            "azure_endpoint": "https://schoollaw-1000-eastus096943908820.openai.azure.com/"
-          },
-          "custom_prompt": "Please focus extraction on people, statements, and actions that could have relevance within the context of investigations into educational malfeasance or record cover-up"
-        }
-      },
-      "enable_graph": True
-    }
-  }
-      
-
-def get_config_from_db(db: Session, key: str = "main"):
-    """Get configuration from database."""
-    try:
-        config = db.query(ConfigModel).filter(ConfigModel.key == key).first()
-        
-        if not config:
-            # Create default config with proper provider configurations
-            default_config = get_default_configuration()
-            db_config = ConfigModel(key=key, value=default_config)
-            db.add(db_config)
-            db.commit()
-            db.refresh(db_config)
-            return default_config
-        
-        # Ensure the config has all required sections with defaults
-        config_value = config.value
-        default_config = get_default_configuration()
-        
-        # Merge with defaults to ensure all required fields exist
-        if "openmemory" not in config_value:
-            config_value["openmemory"] = default_config["openmemory"]
-        
-        if "mem0" not in config_value:
-            config_value["mem0"] = default_config["mem0"]
-        else:
-            # Ensure LLM config exists with defaults
-            if "llm" not in config_value["mem0"] or config_value["mem0"]["llm"] is None:
-                config_value["mem0"]["llm"] = default_config["mem0"]["llm"]
-            
-            # Ensure embedder config exists with defaults
-            if "embedder" not in config_value["mem0"] or config_value["mem0"]["embedder"] is None:
-                config_value["mem0"]["embedder"] = default_config["mem0"]["embedder"]
-            
-            # Enable graph if not explicitly set
-            if "enable_graph" not in config_value["mem0"]:
-                config_value["mem0"]["enable_graph"] = "graph_store" in config_value["mem0"] and config_value["mem0"]["graph_store"] is not None                
-        
-        # Save the updated config back to database if it was modified
-        if config_value != config.value:
-            config.value = config_value
-            db.commit()
-            db.refresh(config)
-        
-        logger.info(f"Configuration loaded from database: {config_value}")
-
-        return config_value
-    except Exception as e:
-        logger.error(f"Error loading configuration from database: {str(e)}")
-        save_config_to_db(db, get_default_configuration())
-        try:
-            db_config = ConfigModel(key=key, value=config)
-            db.add(db_config)
-        except Exception as e:            
-            raise HTTPException(
-                status_code=500,
-                detail=f"Failed to load configuration: {str(e)}"
-            )
-
-def save_config_to_db(db: Session, config: Dict[str, Any], key: str = "main"):
+def save_config_to_db(db: Session, config: Dict[str, Any] | ConfigSchema, key: str = "main"):
     """Save configuration to database."""
-    db_config = db.query(ConfigModel).filter(ConfigModel.key == key).first()
-    
-    if db_config:
-        db_config.value = config
-        db_config.updated_at = None  # Will trigger the onupdate to set current time
-    else:
-        db_config = ConfigModel(key=key, value=config)
-        db.add(db_config)
+
+    validated = ConfigSchema.model_validate(config)
+    if not validated:
+        raise HTTPException(status_code=400, detail="Invalid or missing configuration detected")
+    serializable = dict(validated.model_dump(exclude_none=True, exclude_unset=True))
         
+    db_config = db.query(ConfigModel).filter(ConfigModel.key == key).first()    
+    if db_config:
+        db_config.value = serializable # type: ignore - Technically invalid, but will trigger the onupdate to set current time        
+        db_config.updated_at = None  # type: ignore - Technically invalid, but will trigger the onupdate to set current time        
+    else:
+        db_config = ConfigModel(key=key, value=serializable)
+        db.add(db_config)
     db.commit()
     db.refresh(db_config)
     return db_config.value
 
+def _reset_config_db(db: Session, key: str = "main"):
+    """Deletes the existing configuration record, resetting system to defaults."""
+
+    db_config = db.query(ConfigModel).filter(ConfigModel.key == key).first()
+    if db_config:
+        db.delete(db_config)
+        db.commit()
+
+    # Save the default configuration to database    
+    reset_memory_client()
+
+def get_default_config(): 
+    """Gets default configuration formatted for the API and database."""
+    from openmemory.api.app.utils.client_config_factory import get_default_memory_config
+    source = get_default_memory_config(expandSecrets=False)
+    split = split_config(source)    
+    return {
+        "openmemory": OpenMemoryConfig.model_validate(split.get("openmemory", {})),
+        "mem0": Mem0Config.model_validate(split.get("mem0", {}))
+    }
+
+def get_saved_memory_config():
+    """Gets saved configuration formatted for the API and database."""
+    from openmemory.api.app.utils.client_config_factory import get_parsed_memory_config
+    source = get_parsed_memory_config(expandSecrets=False)
+    split = split_config(source)    
+    try:        
+        parsed = ConfigSchema.model_validate(split)
+        return parsed
+    except Exception as e:
+        logger.error(f"Error validating configuration: {e}")
+        raise HTTPException(status_code=500, detail="Invalid configuration format")    
+
 @router.get("/", response_model=ConfigSchema)
 async def get_configuration(db: Session = Depends(get_db)):
     """Get the current configuration."""
-    config = get_config_from_db(db)
+    config = get_saved_memory_config()
+    if not config:
+        # If no configuration exists, return the default configuration
+        config = get_default_config()  
+    else:
+        config = config.model_dump(exclude_none=True, exclude_unset=True)
     return config
 
 @router.put("/", response_model=ConfigSchema)
 async def update_configuration(config: ConfigSchema, db: Session = Depends(get_db)):
     """Update the configuration."""
-    current_config = get_config_from_db(db)
+    current_config = get_saved_memory_config()
     
-    # Convert to dict for processing
-    updated_config = current_config.copy()
-    
+    updated_config = current_config.model_copy(deep=True)
+        
     # Update openmemory settings if provided
     if config.openmemory is not None:
-        if "openmemory" not in updated_config:
-            updated_config["openmemory"] = {}
-        updated_config["openmemory"].update(config.openmemory.dict(exclude_none=True))
+        if updated_config.openmemory is None:
+            updated_config.openmemory = OpenMemoryConfig.model_construct()
+        # Convert both to dictionaries and merge        
+        merged_dict = {**updated_config.openmemory.model_dump(exclude_none=True, exclude_unset=True), **config.openmemory.model_dump(exclude_none=True, exclude_unset=True)}
+        updated_config.openmemory = OpenMemoryConfig.model_validate(merged_dict)
     
     # Update mem0 settings
-    updated_config["mem0"] = config.mem0.dict(exclude_none=True)
+    if config.mem0 is not None:
+        updated_config.mem0 = Mem0Config.model_validate(config.mem0.model_dump(exclude_none=True, exclude_unset=True))
     
     # Save the configuration to database
     save_config_to_db(db, updated_config)
@@ -254,12 +167,10 @@ async def reset_configuration(db: Session = Depends(get_db)):
     """Reset the configuration to default values."""
     try:
         # Get the default configuration with proper provider setups
-        default_config = get_default_configuration()
-        
-        # Save it as the current configuration in the database
-        save_config_to_db(db, default_config)
+        _reset_config_db(db)
         reset_memory_client()
-        return default_config
+        config = get_saved_memory_config()
+        return config.model_dump(exclude_none=True, exclude_unset=True)
     except Exception as e:
         raise HTTPException(
             status_code=500, 
@@ -269,71 +180,68 @@ async def reset_configuration(db: Session = Depends(get_db)):
 @router.get("/mem0/llm", response_model=LLMProvider)
 async def get_llm_configuration(db: Session = Depends(get_db)):
     """Get only the LLM configuration."""
-    config = get_config_from_db(db)
-    llm_config = config.get("mem0", {}).get("llm", {})
+    config = get_saved_memory_config()    
+    llm_config = config.mem0.llm if config.mem0 else {}    
     return llm_config
 
 @router.put("/mem0/llm", response_model=LLMProvider)
 async def update_llm_configuration(llm_config: LLMProvider, db: Session = Depends(get_db)):
     """Update only the LLM configuration."""
-    current_config = get_config_from_db(db)
+    current_config = get_saved_memory_config()
     
     # Ensure mem0 key exists
-    if "mem0" not in current_config:
-        current_config["mem0"] = {}
+    if current_config.mem0 is None:
+        current_config.mem0 = Mem0Config.model_construct()
     
     # Update the LLM configuration
-    current_config["mem0"]["llm"] = llm_config.dict(exclude_none=True)
+    current_config.mem0.llm = LLMProvider.model_validate(llm_config)
     
     # Save the configuration to database
     save_config_to_db(db, current_config)
     reset_memory_client()
-    return current_config["mem0"]["llm"]
+    return current_config.mem0.llm
 
 @router.get("/mem0/embedder", response_model=EmbedderProvider)
 async def get_embedder_configuration(db: Session = Depends(get_db)):
     """Get only the Embedder configuration."""
-    config = get_config_from_db(db)
-    embedder_config = config.get("mem0", {}).get("embedder", {})
-    return embedder_config
+    config = get_saved_memory_config()
+    embedder_config = config.mem0.embedder if config.mem0 else {}    
+    return embedder_config    
 
 @router.put("/mem0/embedder", response_model=EmbedderProvider)
 async def update_embedder_configuration(embedder_config: EmbedderProvider, db: Session = Depends(get_db)):
     """Update only the Embedder configuration."""
-    current_config = get_config_from_db(db)
+    current_config = get_saved_memory_config()
     
     # Ensure mem0 key exists
-    if "mem0" not in current_config:
-        current_config["mem0"] = {}
+    if current_config.mem0 is None:
+        current_config.mem0 = Mem0Config.model_construct()
     
-    # Update the Embedder configuration
-    current_config["mem0"]["embedder"] = embedder_config.dict(exclude_none=True)
+    # Update the LLM configuration
+    current_config.mem0.embedder = EmbedderProvider.model_validate(embedder_config)
     
     # Save the configuration to database
     save_config_to_db(db, current_config)
     reset_memory_client()
-    return current_config["mem0"]["embedder"]
+    return current_config.mem0.embedder
 
 @router.get("/openmemory", response_model=OpenMemoryConfig)
 async def get_openmemory_configuration(db: Session = Depends(get_db)):
     """Get only the OpenMemory configuration."""
-    config = get_config_from_db(db)
-    openmemory_config = config.get("openmemory", {})
+    config = get_saved_memory_config()
+    openmemory_config = config.openmemory if config.openmemory else OpenMemoryConfig.model_construct()
     return openmemory_config
 
 @router.put("/openmemory", response_model=OpenMemoryConfig)
 async def update_openmemory_configuration(openmemory_config: OpenMemoryConfig, db: Session = Depends(get_db)):
     """Update only the OpenMemory configuration."""
-    current_config = get_config_from_db(db)
-    
-    # Ensure openmemory key exists
-    if "openmemory" not in current_config:
-        current_config["openmemory"] = {}
-    
-    # Update the OpenMemory configuration
-    current_config["openmemory"].update(openmemory_config.dict(exclude_none=True))
-    
+    current_config = get_saved_memory_config()        
+    if current_config.openmemory is None:        
+        current_config.openmemory = OpenMemoryConfig.model_construct()
+    # Convert both to dictionaries and merge        
+    merged_dict = {**current_config.openmemory.model_dump(exclude_none=True, exclude_unset=True), **openmemory_config.model_dump(exclude_none=True, exclude_unset=True)}
+    current_config.openmemory = OpenMemoryConfig.model_validate(merged_dict)    
     # Save the configuration to database
     save_config_to_db(db, current_config)
     reset_memory_client()
-    return current_config["openmemory"] 
+    return current_config.openmemory

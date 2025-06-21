@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from typing import Any
 
 
 class VectorStoreBase(ABC):
@@ -13,7 +14,7 @@ class VectorStoreBase(ABC):
         pass
 
     @abstractmethod
-    def search(self, query, vectors, limit=5, filters=None):
+    def search(self, query, vectors, limit=5, filters=None, page=1) -> list[Any]:
         """Search for similar vectors."""
         pass
 

@@ -91,7 +91,7 @@ def parse_environment_variable_value(name, defaultValue: Any = None, expandSecre
         raw_value = os.environ.get(parts[1], defaultValue)
         if raw_value is not None:
             return raw_value  
-        logger.warning(f"Warning: Environment variable {parts[1]} not found, using default value [{defaultValue if defaultValue is not None else 'None'}]")
+        logger.warning(f"Warning: Environment variable {parts[1]} not found, using a default value.")
         return defaultValue
     
     # Otherwise, this is not an environment variable, return it as-is

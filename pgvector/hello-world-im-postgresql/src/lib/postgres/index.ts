@@ -13,7 +13,8 @@ let _db: postgres.Sql<Record<string, unknown>> | undefined;
 export const db = <T extends Record<string, unknown>>(): postgres.Sql<T> => {
   if (!_db) {
     const connectionString = `postgresql://${process.env.POSTGRES_USER ?? 'postgres'}:${process.env.POSTGRES_PASSWORD}@localhost/${process.env.DATABASE_NAME ?? 'postgres'}`.trim();
-    console.log(`Creating new PostgreSQL database connection to ${connectionString}.`);
+    const sanitizedConnectionString = connectionString.replace(/:(.*)@/, ':***@');
+    console.log(`Creating new PostgreSQL database connection to ${sanitizedConnectionString}.`);
     const ret = postgres(connectionString, { ssl: 'verify-full', max: 3, debug: true });
     _db = ret;
   }  

@@ -34,7 +34,7 @@ export async function GET(req: NextRequest) {
           if (result.length === 0 || !('count' in result[0])) {
             throw new Error(`Table ${tableName} does not exist or returned no results`);
           }
-          records = result[0].count;
+          records = Number(result[0].count);
           messages.push(`Table ${tableName} exists with ${records} rows.`);
           tablesAvailable = true;
         } catch (error) {

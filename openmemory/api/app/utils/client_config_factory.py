@@ -59,7 +59,7 @@ def parse_environment_variable_value(name, defaultValue: Any = None, expandSecre
                 try:
                     return int(raw_value)
                 except ValueError:
-                    logger.warning(f"Warning: Environment variable {parts[2]} is not a valid integer")
+                    logger.warning(f"Warning: Environment variable {parts[1]} is not a valid integer")
                     return defaultValue
         
         if parts[1].startswith("bool:"):

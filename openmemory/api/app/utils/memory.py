@@ -10,7 +10,7 @@ import hashlib
 
 from mem0 import Memory
 from app.models import Config as ConfigModel
-from openmemory.api.app.utils.client_config_factory import get_parsed_memory_config
+from app.utils.client_config_factory import get_parsed_memory_config
 
 _memory_client = None
 _config_hash = None

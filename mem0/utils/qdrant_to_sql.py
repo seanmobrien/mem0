@@ -43,7 +43,7 @@ except ImportError:
     raise ImportError("Qdrant requires extra dependencies. Install with `pip install embedchain[qdrant]`") from None
 
 
-def convert_filter_to_sql(
+def convert_qdrant_filter_to_sql(
     qdrant_filter: models.Filter
 ) -> Dict[str, Union[str, List[Any]]]:
     """

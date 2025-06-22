@@ -4,13 +4,14 @@ build-backend = "hatchling.build"
 
 [project]
 name = "mem0ai"
-version = "0.1.106"
+version = "0.500.1"
 description = "Long-term memory for AI Agents"
 authors = [
     { name = "Mem0", email = "founders@mem0.ai" }
 ]
 readme = "README.md"
 requires-python = ">=3.9,<4.0"
+
 dependencies = [
     "qdrant-client>=1.9.1",
     "pydantic>=2.7.3",
@@ -18,7 +19,13 @@ dependencies = [
     "posthog>=3.5.0",
     "pytz>=2024.1",
     "sqlalchemy>=2.0.31",
+    "psycopg2-binary>=2.9.0"
 ]
+
+# Custom metadata for local builds
+[project.urls]
+"Distribution Source" = "https://github.com/seanmobrien/mem0"
+"Build Info" = "local-docker-build"
 
 [project.optional-dependencies]
 graph = [

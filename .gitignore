@@ -181,11 +181,15 @@ notebooks/*.yaml
 # cache db
 *.db
 
-# local directories for testing
+# local directories and files for testing
 eval/
 qdrant_storage/
 .crossnote
 testing.ipynb
+.mcp-client.json
+claude_desktop_config.json
+.env.local
+.openmcp
 
 # IDEs
 .vscode

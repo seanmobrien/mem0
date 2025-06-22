@@ -1,3 +1,5 @@
+# Note: mem0ai is installed from locally built source in Dockerfile
+# All other dependencies for OpenMemory API
 fastapi>=0.68.0
 uvicorn>=0.15.0
 sqlalchemy>=1.4.0
@@ -6,7 +8,6 @@ alembic>=1.7.0
 psycopg2-binary>=2.9.0
 python-multipart>=0.0.5
 fastapi-pagination>=0.12.0
-mem0ai>=0.1.92
 mcp[cli]>=1.3.0
 pytest>=7.0.0
 pytest-asyncio>=0.21.0
@@ -15,5 +16,8 @@ pytest-cov>=4.0.0
 tenacity==9.1.2
 anthropic==0.51.0
 ollama==0.4.8
+
+# Graph dependencies (mem0ai optional dependencies)
 langchain-neo4j>=0.4.0
+neo4j>=5.23.1
 rank-bm25>=0.2.2

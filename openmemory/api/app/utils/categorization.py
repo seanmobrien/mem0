@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 from pydantic import BaseModel
 from tenacity import retry, stop_after_attempt, wait_exponential
 from app.utils.prompts import MEMORY_CATEGORIZATION_PROMPT
-from openmemory.api.app.utils.client_config_factory import get_parsed_memory_config
+from app.utils.client_config_factory import get_parsed_memory_config
 from mem0.utils.factory import LlmFactory
 
 

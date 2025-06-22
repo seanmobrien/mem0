@@ -9,6 +9,9 @@ on:
       - 'openmemory/**'
       - 'server/**'
       - 'pgvector/**'
+      - 'mem0/**'
+      - 'pyproject.toml'
+      - 'build_local.py'
   #pull_request:
   #  paths:
   #    - 'openmemory/**'
@@ -35,7 +38,9 @@ jobs:
         with:
           filters: |
             openmemory:
-              - '{openmemory,server,pgvector}/**'
+              - '{openmemory,server,pgvector,mem0}/**'
+              - 'pyproject.toml'
+              - 'build_local.py'
 
   build-and-push:
     needs: check_changes
@@ -50,7 +55,7 @@ jobs:
         include:
           - service: api
             dockerfile: openmemory/api/Dockerfile
-            context: openmemory/api
+            context: .
             image: openmemory-api
           - service: ui
             dockerfile: openmemory/ui/Dockerfile
@@ -106,6 +111,13 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           platforms: linux/amd64
+          build-args: |
+            BUILD_TYPE=distribution-build
+            GITHUB_REF_NAME=${{ github.ref_name }}
+            GITHUB_RUN_ID=${{ github.run_id }}
+            GITHUB_SHA=${{ github.sha }}
+            GITHUB_ACTOR=${{ github.actor }}
+            GITHUB_WORKFLOW=${{ github.workflow }}
 
       - name: Output image digest
         run: echo "Image digest for ${{ matrix.service }} built successfully"

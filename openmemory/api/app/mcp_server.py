@@ -17,7 +17,7 @@ Key features:
 
 import logging
 import json
-from mcp.server.fastmcp import FastMCP
+from mcp.server.fastmcp import FastMCP, Context
 from mcp.server.sse import SseServerTransport
 from app.utils.memory import get_memory_client
 from fastapi import FastAPI, HTTPException, Request
@@ -59,7 +59,7 @@ mcp_router = APIRouter(prefix="/mcp")
 sse = SseServerTransport("/mcp/messages/")
 
 @mcp.tool(description="Add a new memory. This method is called everytime the user informs anything about themselves, their preferences, or anything that has any relevant information which can be useful in the future conversation. This can also be called when the user asks you to remember something.")
-async def add_memories(text: str) -> str:
+async def add_memories(text: str, ctx: Context) -> str:
     logging.info("Add Memory called with text: %s", text)
     uid = user_id_var.get(None)
     client_name = client_name_var.get(None)
@@ -79,6 +79,9 @@ async def add_memories(text: str) -> str:
         try:
             # Get or create user and app
             user, app = get_user_and_app(db, user_id=uid, app_id=client_name)
+
+            if text.index("kaboom") == -1:
+                raise ValueError(text)
 
             # Check if app is active
             if not app.is_active:
@@ -140,7 +143,8 @@ async def add_memories(text: str) -> str:
             db.close()
     except Exception as e:
         logging.exception(f"Error adding to memory: {e}")
-        return f"Error adding to memory: {e}"
+        raise MemoryError(f"Error adding to memory: {e}")
+        # return f"Error adding to memory: {e}"
 
 
 @mcp.tool(description="Peforms a vector Search through stored memories. This method is called EVERYTIME the user asks anything.  Supports pagination if more context is necessary, but pay attention to the result score.")

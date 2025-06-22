@@ -3,7 +3,7 @@ content-type: application/json
 
 {
   "user_id": "test",
-  "text": "brocolli is nummy.",
+  "text": "broccoli is nummy.",
   "infer": true,
   "app": "openmemory"
 }

@@ -294,13 +294,7 @@ async def create_memory(
                     return memory
     except Exception as qdrant_error:
         logging.warning(f"Qdrant operation failed: {qdrant_error}.")
-        # Return a json response with the error
-        return {
-            "error": str(qdrant_error)
-        }
-
-
-
+        raise ValueError(f"Failed to create memory: {qdrant_error}")        
 
 # Get memory by ID
 @router.get("/{memory_id}")

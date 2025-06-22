@@ -152,15 +152,15 @@ class PGVector(VectorStoreBase):
         Returns:
             list: Search results.
         """
-        filter_conditions = []
         filter_params = []
+        filter_clause = ""
 
         if filters:
             parsed_filters = convert_qdrant_filter_to_sql(filters)
             filter_params.extend(parsed_filters['params'])
-            filter_conditions.append(parsed_filters['clause'])
+            if parsed_filters['clause']:
+                filter_clause = "WHERE " + parsed_filters['clause']
 
-        filter_clause = "WHERE " + " AND ".join(filter_conditions) if filter_conditions else ""
         offset_clause = f"OFFSET {(pageNumber - 1) * limit}" if pageNumber > 1 else ""
         self.cur.execute(
             f"""

@@ -154,9 +154,20 @@ def _process_has_id_condition(
     # Convert all values to strings for consistency
     params = [str(id_val) if id_val is not None else None for id_val in has_id_list]
     
-    # Generate SQL using ANY(ARRAY[...]) for PostgreSQL with %s placeholders
+    # Detect if all params are UUIDs (simple check: 36 chars and 4 dashes)
+    def is_uuid(val):
+        return (
+            isinstance(val, str)
+            and len(val) == 36
+            and val.count('-') == 4
+        )
+    all_uuids = all(is_uuid(p) for p in params if p is not None)
+
     placeholders = ["%s" for _ in params]
-    clause = f"id = ANY(ARRAY[{', '.join(placeholders)}])"
+    if all_uuids:
+        clause = f"id::uuid = ANY(ARRAY[{', '.join(placeholders)}]::uuid[])"
+    else:
+        clause = f"id = ANY(ARRAY[{', '.join(placeholders)}]::text[])"
     
     return clause, params
 

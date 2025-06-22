@@ -336,6 +336,7 @@ class Memory(MemoryBase):
             new_retrieved_facts = json.loads(response)["facts"]
         except Exception as e:
             logging.error(f"Error in new_retrieved_facts: {e}")
+            raise MemoryError(f"Error processing LLM response: {e}")
             new_retrieved_facts = []
 
         if not new_retrieved_facts:
@@ -379,6 +380,7 @@ class Memory(MemoryBase):
             )
         except Exception as e:
             logging.error(f"Error in new memory actions response: {e}")
+            raise MemoryError(f"Error processing LLM response: {e}")
             response = ""
 
         try:
@@ -386,6 +388,7 @@ class Memory(MemoryBase):
             new_memories_with_actions = json.loads(response)
         except Exception as e:
             logging.error(f"Invalid JSON response: {e}")
+            raise MemoryError(f"Error processing LLM response: {e}")
             new_memories_with_actions = {}
 
         returned_memories = []
@@ -434,8 +437,11 @@ class Memory(MemoryBase):
                         logging.info("NOOP for Memory.")
                 except Exception as e:
                     logging.error(f"Error processing memory action: {resp}, Error: {e}")
+                    raise MemoryError(f"Error processing LLM response: {e}")
         except Exception as e:
             logging.error(f"Error iterating new_memories_with_actions: {e}")
+            raise MemoryError(f"Error processing LLM response: {e}")
+
 
         keys, encoded_ids = process_telemetry_filters(filters)
         capture_event(

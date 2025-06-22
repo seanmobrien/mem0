@@ -24,10 +24,10 @@ RUN pip install hatch==1.7.0
 
 # Copy mem0ai source code
 WORKDIR /src/mem0
-COPY --link=true ../../pyproject.toml .
-COPY --link=true ../../README.md .
-COPY --link=true ../../mem0/ ./mem0/
-COPY --link=true ../../build_local.py .
+COPY --link=true pyproject.toml .
+COPY --link=true README.md .
+COPY --link=true mem0/ ./mem0/
+COPY --link=true build_local.py .
 
 # Build the mem0ai package with CI/CD metadata
 RUN python build_local.py
@@ -46,7 +46,7 @@ RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 COPY --from=builder --link=true /src/mem0/dist/*.whl /tmp/
 
 # Copy and install requirements first (better caching for development)
-COPY --link=true requirements.txt .
+COPY --link=true openmemory/api/requirements.txt .
 RUN pip install /tmp/*.whl && \
     rm -rf /tmp/*.whl && \
     pip install -r requirements.txt && \
@@ -56,7 +56,7 @@ RUN pip install /tmp/*.whl && \
     chown -R appuser:appuser /usr/src/openmemory /mnt/db
 
 # Copy app files last (better cache invalidation for development)
-COPY --link=true . .
+COPY --link=true openmemory/api/ .
 
 # Fix ownership of copied files and switch to non-root user
 RUN chown -R appuser:appuser /usr/src/openmemory

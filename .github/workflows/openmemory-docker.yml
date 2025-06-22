@@ -9,6 +9,9 @@ on:
       - 'openmemory/**'
       - 'server/**'
       - 'pgvector/**'
+      - 'mem0/**'
+      - 'pyproject.toml'
+      - 'build_local.py'
   #pull_request:
   #  paths:
   #    - 'openmemory/**'
@@ -35,7 +38,9 @@ jobs:
         with:
           filters: |
             openmemory:
-              - '{openmemory,server,pgvector}/**'
+              - '{openmemory,server,pgvector,mem0}/**'
+              - 'pyproject.toml'
+              - 'build_local.py'
 
   build-and-push:
     needs: check_changes
@@ -50,7 +55,7 @@ jobs:
         include:
           - service: api
             dockerfile: openmemory/api/Dockerfile
-            context: openmemory/api
+            context: .
             image: openmemory-api
           - service: ui
             dockerfile: openmemory/ui/Dockerfile

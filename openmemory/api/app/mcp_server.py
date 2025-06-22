@@ -377,7 +377,7 @@ async def delete_all_memories() -> str:
             db.close()
     except Exception as e:
         logging.exception(f"Error deleting memories: {e}")
-        raise MemoryError(f"Error searching memory: {e}")
+        raise MemoryError(f"Error deleting memories: {e}")
 
 
 @mcp_router.get("/{client_name}/sse/{user_id}")

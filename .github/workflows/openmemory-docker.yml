@@ -106,6 +106,13 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           platforms: linux/amd64
+          build-args: |
+            BUILD_TYPE=distribution-build
+            GITHUB_REF_NAME=${{ github.ref_name }}
+            GITHUB_RUN_ID=${{ github.run_id }}
+            GITHUB_SHA=${{ github.sha }}
+            GITHUB_ACTOR=${{ github.actor }}
+            GITHUB_WORKFLOW=${{ github.workflow }}
 
       - name: Output image digest
         run: echo "Image digest for ${{ matrix.service }} built successfully"

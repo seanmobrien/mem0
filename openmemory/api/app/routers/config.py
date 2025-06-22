@@ -1,10 +1,5 @@
-import os
-import json
 from typing import Dict, Any, Optional
-
-from sqlalchemy import Column
-import sqlalchemy
-from openmemory.api.app.utils.client_config_factory import split_config
+from app.utils.client_config_factory import split_config
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -12,7 +7,6 @@ import logging
 from app.database import get_db
 from app.models import Config as ConfigModel
 from app.utils.memory import reset_memory_client
-#from app.utils.clientConfigFactory import get_default_memory_config, get_parsed_memory_config
 
 logger = logging.getLogger(__name__)
 
@@ -25,8 +19,6 @@ class LLMKwargsAzure(BaseModel):
     api_version: Optional[str] = None
     default_headers: Optional[Dict[str, str]] = None
     
-                                                      
-
 class LLMConfig(BaseModel):
     model: str = Field(..., description="LLM model name")
     temperature: Optional[float | str] = None
@@ -107,7 +99,7 @@ def _reset_config_db(db: Session, key: str = "main"):
 
 def get_default_config(): 
     """Gets default configuration formatted for the API and database."""
-    from openmemory.api.app.utils.client_config_factory import get_default_memory_config
+    from app.utils.client_config_factory import get_default_memory_config
     source = get_default_memory_config(expandSecrets=False)
     split = split_config(source)    
     return {
@@ -117,7 +109,7 @@ def get_default_config():
 
 def get_saved_memory_config():
     """Gets saved configuration formatted for the API and database."""
-    from openmemory.api.app.utils.client_config_factory import get_parsed_memory_config
+    from app.utils.client_config_factory import get_parsed_memory_config
     source = get_parsed_memory_config(expandSecrets=False)
     split = split_config(source)    
     try:        

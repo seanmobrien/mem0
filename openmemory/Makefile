@@ -24,7 +24,7 @@ env:
 	cd ui && cp .env.example .env
 
 build:
-	docker compose build
+	docker compose build --build-arg BUILDKIT_INLINE_CACHE=1
 
 up:
 	NEXT_PUBLIC_USER_ID=$(USER) NEXT_PUBLIC_API_URL=$(NEXT_PUBLIC_API_URL) docker compose up

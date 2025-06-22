@@ -1,5 +1,5 @@
-from openmemory.api.app.utils.client_config_factory import get_parsed_memory_config
-from fastapi import APIRouter, Depends, HTTPException
+from app.utils.client_config_factory import get_parsed_memory_config
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 import logging
 from app.database import get_db
@@ -8,6 +8,8 @@ from app.utils.memory import get_memory_client
 from typing import Optional
 from fastapi import Depends
 from mem0.utils.factory import VectorStoreFactory
+import mem0
+from datetime import datetime, timezone
 
 
 logger = logging.getLogger(__name__)
@@ -60,13 +62,63 @@ def _safe_check_config(config: dict, key: str) -> bool:
         return key in config and config[key] is not None
     except Exception as e:        
         return False
+
+def get_mem0_build_info(verbose: bool = False) -> dict:
+    """
+    Get mem0 build information for health check responses.
+    
+    Args:
+        verbose: If True, include detailed build information
+        
+    Returns:
+        Dictionary containing mem0 build information
+    """
+    try:
+        build_info = mem0.__build_info__
+        
+        mem0_info = {
+            "version": mem0.__version__,
+            "build_type": build_info['type'],
+            "build_info": build_info.get('info', 'unknown')
+        }
+        
+        # Add detailed CI/CD information if available
+        if build_info['type'] == 'distribution_build':
+            mem0_info["ci_metadata"] = {
+                "commit": build_info.get('commit'),
+                "run_id": build_info.get('run_id'), 
+                "build_timestamp": build_info.get('timestamp')
+            }
+        
+        # Add verbose details if requested
+        if verbose:
+            mem0_info["verbose"] = {
+                "mem0_version": mem0.__version__,
+                "build_details": build_info,
+                "build_stamp": getattr(mem0, '__build_stamp__', 'not available')
+            }
+        
+        return mem0_info
+        
+    except Exception as e:
+        logger.error(f"Error getting mem0 build info: {e}")
+        return {
+            "version": "unknown",
+            "build_type": "unknown", 
+            "build_info": f"error: {str(e)}"
+        }
     
 
 @router.get("/health-check")
-async def health_check(strict: bool = True, db: Optional[Session] = Depends(get_db)): 
+async def health_check(
+    strict: bool = True, 
+    verbose: int = Query(0, description="Include verbose mem0 build information (1 for verbose)"),
+    db: Optional[Session] = Depends(get_db)
+): 
     """
     Health check endpoint to verify the API is running.
     @param strict: If True (the default), health check will fail if any critical service is down.
+    @param verbose: If 1, include detailed mem0 build information in response.
     """
 
     client_active: bool = False
@@ -85,6 +137,9 @@ async def health_check(strict: bool = True, db: Optional[Session] = Depends(get_
                 detail={
                     "error": "Service is not fully operational - configuration data not found.",
                     "code": 503,
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "service": "openmemory-api",
+                    "mem0": get_mem0_build_info(verbose == 1),
                     "details": {
                         "config_present": False, 
                         "client_active": client_active,
@@ -188,6 +243,9 @@ async def health_check(strict: bool = True, db: Optional[Session] = Depends(get_
             detail={
                 "error": "Service is not fully operational.",
                 "code": 503,
+                "timestamp": datetime.utcnow().isoformat(),
+                "service": "openmemory-api",
+                "mem0": get_mem0_build_info(verbose == 1),
                 "details": {
                     "client_active": client_active,
                     "system_db_available": system_db_available,
@@ -195,19 +253,26 @@ async def health_check(strict: bool = True, db: Optional[Session] = Depends(get_
                     "vector_store_available": vector_store_available,
                     "graph_enabled": graph_enabled,
                     "graph_store_available": graph_store_available,
-                    "history_store_available": history_store_available,                    
+                    "history_store_available": history_store_available,
                     "errors": errors
                 }
             }
         )
     # And send all this data back
-    return {"status": "ok", "message": "API is running smoothly.", "details": {
-        "client_active": client_active,
-        "system_db_available": system_db_available,
-        "vector_enabled": vector_enabled,
-        "vector_store_available": vector_store_available,
-        "graph_enabled": graph_enabled,        
-        "graph_store_available": graph_store_available,
-        "history_store_available": history_store_available,
-        "errors": errors
-    }}
+    return {
+        "status": "ok", 
+        "message": "API is running smoothly.", 
+        "timestamp": datetime.utcnow().isoformat(),
+        "service": "openmemory-api",
+        "mem0": get_mem0_build_info(verbose == 1),
+        "details": {
+            "client_active": client_active,
+            "system_db_available": system_db_available,
+            "vector_enabled": vector_enabled,
+            "vector_store_available": vector_store_available,
+            "graph_enabled": graph_enabled,        
+            "graph_store_available": graph_store_available,
+            "history_store_available": history_store_available,
+            "errors": errors
+        }
+    }

@@ -16,6 +16,20 @@ def get_git_commit():
     except:
         return "unknown"
 
+def sanitize_version_component(component):
+    """Sanitize a component for use in version strings per PEP 440"""
+    # Replace problematic characters with hyphens
+    import re
+    # Replace forward slashes, backslashes, and other problematic chars with hyphens
+    sanitized = re.sub(r'[/\\:]', '-', component)
+    # Remove or replace other non-alphanumeric chars except dots, hyphens, and underscores
+    sanitized = re.sub(r'[^a-zA-Z0-9.\-_]', '-', sanitized)
+    # Remove consecutive hyphens
+    sanitized = re.sub(r'-+', '-', sanitized)
+    # Remove leading/trailing hyphens
+    sanitized = sanitized.strip('-')
+    return sanitized or 'unknown'
+
 def get_build_info():
     """Generate build information based on environment"""
     timestamp = datetime.datetime.now().strftime("%Y%m%d.%H%M%S")
@@ -25,7 +39,7 @@ def get_build_info():
     if os.getenv('GITHUB_ACTIONS'):
         # GitHub Actions environment
         build_type = os.getenv('BUILD_TYPE', 'distribution-build')
-        branch = os.getenv('GITHUB_REF_NAME', 'unknown')
+        branch = sanitize_version_component(os.getenv('GITHUB_REF_NAME', 'unknown'))
         run_id = os.getenv('GITHUB_RUN_ID', 'unknown')
         sha = os.getenv('GITHUB_SHA', commit)[:7] if os.getenv('GITHUB_SHA') else commit
         

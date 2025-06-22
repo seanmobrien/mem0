@@ -243,7 +243,7 @@ async def health_check(
             detail={
                 "error": "Service is not fully operational.",
                 "code": 503,
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
                 "service": "openmemory-api",
                 "mem0": get_mem0_build_info(verbose == 1),
                 "details": {

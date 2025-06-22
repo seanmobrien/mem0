@@ -20,7 +20,7 @@ ENV GITHUB_WORKFLOW=${GITHUB_WORKFLOW}
 
 # Install build dependencies and git for metadata
 RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
-RUN pip install hatch
+RUN pip install hatch==1.7.0
 
 # Copy mem0ai source code
 WORKDIR /src/mem0

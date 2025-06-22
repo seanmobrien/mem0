@@ -17,7 +17,7 @@ Key features:
 
 import logging
 import json
-from mcp.server.fastmcp import FastMCP
+from mcp.server.fastmcp import FastMCP, Context
 from mcp.server.sse import SseServerTransport
 from app.utils.memory import get_memory_client
 from fastapi import FastAPI, HTTPException, Request
@@ -59,7 +59,7 @@ mcp_router = APIRouter(prefix="/mcp")
 sse = SseServerTransport("/mcp/messages/")
 
 @mcp.tool(description="Add a new memory. This method is called everytime the user informs anything about themselves, their preferences, or anything that has any relevant information which can be useful in the future conversation. This can also be called when the user asks you to remember something.")
-async def add_memories(text: str) -> str:
+async def add_memories(text: str, ctx: Context) -> str:
     logging.info("Add Memory called with text: %s", text)
     uid = user_id_var.get(None)
     client_name = client_name_var.get(None)
@@ -140,7 +140,8 @@ async def add_memories(text: str) -> str:
             db.close()
     except Exception as e:
         logging.exception(f"Error adding to memory: {e}")
-        return f"Error adding to memory: {e}"
+        raise MemoryError(f"Error adding to memory: {e}")
+        # return f"Error adding to memory: {e}"
 
 
 @mcp.tool(description="Peforms a vector Search through stored memories. This method is called EVERYTIME the user asks anything.  Supports pagination if more context is necessary, but pay attention to the result score.")
@@ -177,15 +178,7 @@ async def search_memory(query: str, numberOfHits = 10, page = 1) -> str:
 
             filters = qdrant_models.Filter(must=conditions)
             embeddings = memory_client.embedding_model.embed(query, "search")
-            
-            #
-            #hits = memory_client.vector_store.client.query_points(
-            #    collection_name=memory_client.vector_store.collection_name,
-            #    query=embeddings,
-            #    query_filter=filters,
-            #    limit=10,
-            #)
-            #
+                        
             hits = memory_client.vector_store.search(
                 query,                      # search query, also not actually used
                 embeddings,                 # This is where the real magic is
@@ -249,7 +242,7 @@ async def search_memory(query: str, numberOfHits = 10, page = 1) -> str:
             db.close()
     except Exception as e:
         logging.exception(e)
-        return f"Error searching memory: {e}"
+        raise MemoryError(f"Error searching memory: {e}")
 
 @mcp.tool(description="List all memories in the user's memory")
 async def list_memories() -> str:
@@ -318,9 +311,9 @@ async def list_memories() -> str:
             db.close()
     except Exception as e:
         logging.exception(f"Error getting memories: {e}")
-        return f"Error getting memories: {e}"
+        raise MemoryError(f"Error searching memory: {e}")
 
-
+#LMAO why is this even a tool?
 @mcp.tool(description="Delete all memories in the user's memory")
 async def delete_all_memories() -> str:
     logging.warning("Delete All Memories called")
@@ -384,7 +377,7 @@ async def delete_all_memories() -> str:
             db.close()
     except Exception as e:
         logging.exception(f"Error deleting memories: {e}")
-        return f"Error deleting memories: {e}"
+        raise MemoryError(f"Error deleting memories: {e}")
 
 
 @mcp_router.get("/{client_name}/sse/{user_id}")

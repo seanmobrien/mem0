@@ -113,13 +113,18 @@ def create_build_info_file():
     }
     
     if os.getenv('GITHUB_ACTIONS'):
+        # Get environment variables with fallbacks for empty strings
+        def get_env_var(name, default='unknown'):
+            value = os.getenv(name, default)
+            return value if value and value.strip() else default
+            
         metadata.update({
             "build_type": "distribution-build",
-            "branch": os.getenv('GITHUB_REF_NAME', 'unknown'),
-            "run_id": os.getenv('GITHUB_RUN_ID', 'unknown'),
-            "sha": os.getenv('GITHUB_SHA', 'unknown'),
-            "actor": os.getenv('GITHUB_ACTOR', 'unknown'),
-            "workflow": os.getenv('GITHUB_WORKFLOW', 'unknown')
+            "branch": get_env_var('GITHUB_REF_NAME'),
+            "run_id": get_env_var('GITHUB_RUN_ID'),
+            "sha": get_env_var('GITHUB_SHA'),
+            "actor": get_env_var('GITHUB_ACTOR'),
+            "workflow": get_env_var('GITHUB_WORKFLOW')
         })
     else:
         metadata["build_type"] = "local"

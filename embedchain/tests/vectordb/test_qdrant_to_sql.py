@@ -14,7 +14,7 @@ except ImportError:
     # Create mock models for testing
     models = Mock()
 
-from mem0.utils.qdrant_to_sql import convert_filter_to_sql
+from mem0.utils.qdrant_to_sql import convert_qdrant_filter_to_sql
 
 
 class TestQdrantToSQL(unittest.TestCase):
@@ -36,7 +36,7 @@ class TestQdrantToSQL(unittest.TestCase):
             ]
         )
         
-        result = convert_filter_to_sql(filter_obj)
+        result = convert_qdrant_filter_to_sql(filter_obj)
         
         expected = {
             'clause': "(payload->>'city' = %s)",
@@ -55,7 +55,7 @@ class TestQdrantToSQL(unittest.TestCase):
             ]
         )
         
-        result = convert_filter_to_sql(filter_obj)
+        result = convert_qdrant_filter_to_sql(filter_obj)
         
         expected = {
             'clause': "(payload->>'categories' = ANY(ARRAY[%s, %s, %s]))",
@@ -74,7 +74,7 @@ class TestQdrantToSQL(unittest.TestCase):
             ]
         )
         
-        result = convert_filter_to_sql(filter_obj)
+        result = convert_qdrant_filter_to_sql(filter_obj)
         
         expected = {
             'clause': "((payload->>'price')::numeric >= %s AND (payload->>'price')::numeric <= %s)",
@@ -93,7 +93,7 @@ class TestQdrantToSQL(unittest.TestCase):
             ]
         )
         
-        result = convert_filter_to_sql(filter_obj)
+        result = convert_qdrant_filter_to_sql(filter_obj)
         
         # Should include all range conditions
         self.assertIn("(payload->>'score')::numeric >= %s", result['clause'])
@@ -117,7 +117,7 @@ class TestQdrantToSQL(unittest.TestCase):
             ]
         )
         
-        result = convert_filter_to_sql(filter_obj)
+        result = convert_qdrant_filter_to_sql(filter_obj)
         
         expected = {
             'clause': "(payload->>'city' = %s AND payload->>'category' = %s)",
@@ -140,7 +140,7 @@ class TestQdrantToSQL(unittest.TestCase):
             ]
         )
         
-        result = convert_filter_to_sql(filter_obj)
+        result = convert_qdrant_filter_to_sql(filter_obj)
         
         expected = {
             'clause': "NOT (payload->>'status' = %s OR payload->>'deleted' = %s)",
@@ -163,7 +163,7 @@ class TestQdrantToSQL(unittest.TestCase):
             ]
         )
         
-        result = convert_filter_to_sql(filter_obj)
+        result = convert_qdrant_filter_to_sql(filter_obj)
         
         expected = {
             'clause': "(payload->>'priority' = %s OR payload->>'urgent' = %s)",
@@ -194,7 +194,7 @@ class TestQdrantToSQL(unittest.TestCase):
             ]
         )
         
-        result = convert_filter_to_sql(filter_obj)
+        result = convert_qdrant_filter_to_sql(filter_obj)
         
         # Should contain all three parts connected with AND
         self.assertIn("payload->>'city' = %s", result['clause'])
@@ -217,7 +217,7 @@ class TestQdrantToSQL(unittest.TestCase):
             ]
         )
         
-        result = convert_filter_to_sql(filter_obj)
+        result = convert_qdrant_filter_to_sql(filter_obj)
         
         expected = {
             'clause': "(FALSE)",
@@ -236,7 +236,7 @@ class TestQdrantToSQL(unittest.TestCase):
             ]
         )
         
-        result = convert_filter_to_sql(filter_obj)
+        result = convert_qdrant_filter_to_sql(filter_obj)
         
         expected = {
             'clause': "(payload->>'city' = %s)",
@@ -250,7 +250,7 @@ class TestQdrantToSQL(unittest.TestCase):
         field_condition.is_empty = True
         filter_obj = models.Filter(must=[field_condition])
         
-        result = convert_filter_to_sql(filter_obj)
+        result = convert_qdrant_filter_to_sql(filter_obj)
         
         expected = {
             'clause': "((payload->>'tags' IS NULL OR jsonb_array_length(payload->'tags') = 0))",
@@ -264,7 +264,7 @@ class TestQdrantToSQL(unittest.TestCase):
         field_condition.is_null = False
         filter_obj = models.Filter(must=[field_condition])
         
-        result = convert_filter_to_sql(filter_obj)
+        result = convert_qdrant_filter_to_sql(filter_obj)
         
         expected = {
             'clause': "(payload->>'optional_field' IS NOT NULL)",
@@ -283,7 +283,7 @@ class TestQdrantToSQL(unittest.TestCase):
             ]
         )
         
-        result = convert_filter_to_sql(filter_obj)
+        result = convert_qdrant_filter_to_sql(filter_obj)
         
         expected = {
             'clause': "(jsonb_array_length(payload->'tags') >= %s AND jsonb_array_length(payload->'tags') <= %s)",
@@ -302,7 +302,7 @@ class TestQdrantToSQL(unittest.TestCase):
             ]
         )
         
-        result = convert_filter_to_sql(filter_obj)
+        result = convert_qdrant_filter_to_sql(filter_obj)
         
         expected = {
             'clause': "(payload->>'count' = %s)",
@@ -321,7 +321,7 @@ class TestQdrantToSQL(unittest.TestCase):
             ]
         )
         
-        result = convert_filter_to_sql(filter_obj)
+        result = convert_qdrant_filter_to_sql(filter_obj)
         
         expected = {
             'clause': "(payload->>'active' = %s)",
@@ -333,7 +333,7 @@ class TestQdrantToSQL(unittest.TestCase):
         """Test converting an empty filter."""
         filter_obj = models.Filter()
         
-        result = convert_filter_to_sql(filter_obj)
+        result = convert_qdrant_filter_to_sql(filter_obj)
         
         expected = {
             'clause': "",
@@ -344,7 +344,7 @@ class TestQdrantToSQL(unittest.TestCase):
     def test_invalid_input_type(self):
         """Test error handling for invalid input type."""
         with self.assertRaises(TypeError):
-            convert_filter_to_sql("not a filter object")
+            convert_qdrant_filter_to_sql("not a filter object")
     
     def test_only_range_gt_lt(self):
         """Test range filter with only gt and lt."""
@@ -357,7 +357,7 @@ class TestQdrantToSQL(unittest.TestCase):
             ]
         )
         
-        result = convert_filter_to_sql(filter_obj)
+        result = convert_qdrant_filter_to_sql(filter_obj)
         
         expected = {
             'clause': "((payload->>'temperature')::numeric > %s AND (payload->>'temperature')::numeric < %s)",
@@ -376,7 +376,7 @@ class TestQdrantToSQL(unittest.TestCase):
             ]
         )
         
-        result = convert_filter_to_sql(filter_obj)
+        result = convert_qdrant_filter_to_sql(filter_obj)
         
         expected = {
             'clause': "(payload->>'user-name' = %s)",
@@ -395,7 +395,7 @@ class TestQdrantToSQL(unittest.TestCase):
             ]
         )
         
-        result = convert_filter_to_sql(filter_obj)
+        result = convert_qdrant_filter_to_sql(filter_obj)
         
         expected = {
             'clause': "(payload->>'mixed_values' = ANY(ARRAY[%s, %s, %s, %s]))",
@@ -469,7 +469,7 @@ class TestQdrantToSQL(unittest.TestCase):
             should=should_conditions
         )
         
-        result = convert_filter_to_sql(filter_obj)
+        result = convert_qdrant_filter_to_sql(filter_obj)
         
         # Verify the structure
         self.assertIn("payload->>'city' = %s", result['clause'])
@@ -490,7 +490,7 @@ class TestQdrantToSQL(unittest.TestCase):
             must=[models.HasIdCondition(has_id=[1, 2, 3])]
         )
         
-        result = convert_filter_to_sql(filter_obj)
+        result = convert_qdrant_filter_to_sql(filter_obj)
         
         expected = {
             'clause': "(id = ANY(ARRAY[%s, %s, %s]))",
@@ -504,7 +504,7 @@ class TestQdrantToSQL(unittest.TestCase):
             must_not=[models.HasIdCondition(has_id=[4, 5, 6])]
         )
         
-        result = convert_filter_to_sql(filter_obj)
+        result = convert_qdrant_filter_to_sql(filter_obj)
         
         expected = {
             'clause': "NOT (id = ANY(ARRAY[%s, %s, %s]))",
@@ -518,7 +518,7 @@ class TestQdrantToSQL(unittest.TestCase):
             should=[models.HasIdCondition(has_id=[7, 8, 9])]
         )
         
-        result = convert_filter_to_sql(filter_obj)
+        result = convert_qdrant_filter_to_sql(filter_obj)
         
         expected = {
             'clause': "(id = ANY(ARRAY[%s, %s, %s]))",
@@ -538,7 +538,7 @@ class TestQdrantToSQL(unittest.TestCase):
             ]
         )
         
-        result = convert_filter_to_sql(filter_obj)
+        result = convert_qdrant_filter_to_sql(filter_obj)
         
         expected = {
             'clause': "(payload->>'city' = %s AND id = ANY(ARRAY[%s, %s, %s]))",
@@ -552,7 +552,7 @@ class TestQdrantToSQL(unittest.TestCase):
             must=[models.HasIdCondition(has_id=[])]
         )
         
-        result = convert_filter_to_sql(filter_obj)
+        result = convert_qdrant_filter_to_sql(filter_obj)
         
         expected = {
             'clause': "(FALSE)",
@@ -566,7 +566,7 @@ class TestQdrantToSQL(unittest.TestCase):
             must=[models.HasIdCondition(has_id=["user-123", "user-456", "user-789"])]
         )
         
-        result = convert_filter_to_sql(filter_obj)
+        result = convert_qdrant_filter_to_sql(filter_obj)
         
         expected = {
             'clause': "(id = ANY(ARRAY[%s, %s, %s]))",
@@ -580,7 +580,7 @@ class TestQdrantToSQL(unittest.TestCase):
             must=[models.HasIdCondition(has_id=[42])]
         )
         
-        result = convert_filter_to_sql(filter_obj)
+        result = convert_qdrant_filter_to_sql(filter_obj)
         
         expected = {
             'clause': "(id = ANY(ARRAY[%s]))",
@@ -594,7 +594,7 @@ class TestQdrantToSQL(unittest.TestCase):
             must=[models.HasIdCondition(has_id=[1, "abc", 3])]
         )
         
-        result = convert_filter_to_sql(filter_obj)
+        result = convert_qdrant_filter_to_sql(filter_obj)
         
         expected = {
             'clause': "(id = ANY(ARRAY[%s, %s, %s]))",
@@ -628,7 +628,7 @@ class TestQdrantToSQL(unittest.TestCase):
             ]
         )
         
-        result = convert_filter_to_sql(filter_obj)
+        result = convert_qdrant_filter_to_sql(filter_obj)
         
         # Check that all parts are present in the clause
         self.assertIn("payload->>'city' = %s", result['clause'])
@@ -653,7 +653,7 @@ class TestQdrantToSQL(unittest.TestCase):
             ]
         )
         
-        result = convert_filter_to_sql(filter_obj)
+        result = convert_qdrant_filter_to_sql(filter_obj)
         
         expected = {
             'clause': "NOT (id = ANY(ARRAY[%s, %s]) OR id = ANY(ARRAY[%s, %s]))",

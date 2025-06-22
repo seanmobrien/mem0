@@ -147,7 +147,7 @@ class PGVector(VectorStoreBase):
             query (str): Query - Not really used, this isn't a hybrid search.
             vectors (List[float]): Query vector - This is where the real money is hiding.
             limit (int, optional): Number of results to return. Defaults to 5.
-            filters (Dict, optional): Filters to apply to the search. Defaults to None.  Currently only supports equality filters on payload fields.
+            filters (Dict, optional): Filters to apply to the search. Defaults to None. Supports flexible Qdrant-style filtering.
 
         Returns:
             list: Search results.
@@ -267,20 +267,20 @@ class PGVector(VectorStoreBase):
         List all vectors in a collection.
 
         Args:
-            filters (Dict, optional): Filters to apply to the list.
+            filters (Dict, optional): Filters to apply to the list. Defaults to None. Supports flexible Qdrant-style filtering.
             limit (int, optional): Number of vectors to return. Defaults to 100.
 
         Returns:
             List[OutputData]: List of vectors.
         """
-        filter_conditions = []
         filter_params = []
+        filter_clause = ""
 
         if filters:
             parsed_filters = convert_qdrant_filter_to_sql(filters)
             filter_params.extend(parsed_filters['params'])
-
-        filter_clause = "WHERE " + " AND ".join(filter_conditions) if filter_conditions else ""
+            if parsed_filters['clause']:
+                filter_clause = "WHERE " + parsed_filters['clause']
 
         query = f"""
             SELECT id, vector, payload

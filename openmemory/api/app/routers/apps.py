@@ -218,12 +218,18 @@ async def update_app_details(
     app_id: UUID,
     is_active: bool,
     description: Optional[str] = None,
+    metadata: Optional[dict] = None,
     db: Session = Depends(get_db)
 ):
     app = get_app_or_404(db, app_id)
     app.is_active = is_active # type: ignore
     if (description is not None):
         app.description = description # type: ignore
+    if (metadata is not None):        
+        if not isinstance(metadata, dict):
+            raise HTTPException(status_code=400, detail="Metadata must be a dictionary")
+        existing_metadata = app.metadata_ if app.metadata_ is not None else {}
+        app.metadata_ = {**existing_metadata, **metadata} # type: ignore        
     app.updated_at = datetime.datetime.now(datetime.timezone.utc) # type: ignore
     db.commit()
     return {"status": "success", "message": "Updated app details successfully"}
@@ -234,6 +240,7 @@ async def create_app(
     owner: str,
     description: Optional[str] = None,
     is_active: bool = True,
+    metadata: Optional[dict] = None,
     db: Session = Depends(get_db)
 ):
     # Validate input
@@ -249,7 +256,7 @@ async def create_app(
         raise HTTPException(status_code=404, detail="Owner not found")
     # Make sure we don't already have an app with this name
     existing_app = db.execute(
-        sql.select(App.id).where(App.name == name)
+        sql.select(App.id).where(App.name == name, App.owner_id == userId)
     ).scalars().first()
     if existing_app:
         raise HTTPException(status_code=400, detail="App with this name already exists")
@@ -259,6 +266,7 @@ async def create_app(
         is_active=is_active,
         owner_id=userId,
         description=description,
+        metadata_= metadata or {},
         created_at=datetime.datetime.now(datetime.timezone.utc),
         updated_at=datetime.datetime.now(datetime.timezone.utc),
     )

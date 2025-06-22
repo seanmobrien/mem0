@@ -3,7 +3,7 @@ import datetime
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import String, Uuid, func, desc
+from sqlalchemy import String, Uuid, func, desc, sql
 
 from app.database import get_db
 from app.models import User, App, Memory, MemoryAccessLog, MemoryState
@@ -30,9 +30,10 @@ async def list_users(
     #sort_direction: str = 'asc',
     #page: int = Query(1, ge=1),
     #page_size: int = Query(10, ge=1, le=100),
-    #db: Session = Depends(get_db)
+    db: Session = Depends(get_db)
 ):
     raise HTTPException(status_code=501, detail="This endpoint is not implemented yet")
+    #return db.query(User).all()
 
 # Get app details
 @router.get("/{user_id}")
@@ -65,23 +66,27 @@ async def get_user_details(
 @router.post("/")
 async def create_user(
     user_id: str,
-    name: str = "",
-    is_active: bool = True,
+    name: str = "",    
+    email: Optional[str] = None,
+    metadata: Optional[dict] = None,
     db: Session = Depends(get_db)
 ):
     # Validate input
     if not user_id:
-        raise HTTPException(status_code=400, detail="App name cannot be empty")
+        raise HTTPException(status_code=400, detail="User ID cannot be empty")
     # Check if user exists
-    user = db.query(User).filter(User.user_id == user_id or User.id == user_id).first()
-    if user:
+    # Check if user exists and retrieve id
+    userId = db.execute(
+        sql.select(User.id).where(User.user_id == user_id)
+    ).scalars().first()
+    if userId:
         raise HTTPException(status_code=409, detail="Username already exists")
-    # Check if app with this name already exists    
+    # Create record
     new_user = User(
         name=name, 
-        is_active=is_active,
+        email=email,
         user_id=user_id,
-        owner_id=user.id,
+        metadata_= metadata or {},
         created_at=datetime.datetime.now(datetime.UTC),
         updated_at=datetime.datetime.now(datetime.UTC),
     )
@@ -89,4 +94,35 @@ async def create_user(
     db.commit()
     db.refresh(new_user)
 
-    return {"status": "success", "message": "User created successfully", "app_id": new_user.id, "data": new_user}
+    return {"status": "success", "message": "User created successfully", "user_id": new_user.id, "data": new_user}
+
+@router.put("/")
+async def edit_user(
+    user_id: str,
+    name: Optional[str] = None,    
+    email: Optional[str] = None,
+    metadata: Optional[dict] = None,
+    db: Session = Depends(get_db)
+):
+    # Validate input
+    if not user_id:
+        raise HTTPException(status_code=400, detail="User ID cannot be empty")
+    # Check if user exists
+    user = db.query(User).filter(User.user_id == user_id).first()
+    if user is None:
+        raise HTTPException(status_code=404, detail="Username not found")
+    # Update user fields
+    if name is not None:
+        user.name = name # type: ignore
+    if email is not None:
+        user.email = email # type: ignore
+    if metadata is not None:
+        if not isinstance(metadata, dict):
+            raise HTTPException(status_code=400, detail="Metadata must be a dictionary")
+        user.metadata_ = {**(user.metadata_ or {}), **metadata} # type: ignore
+    user.updated_at = datetime.datetime.now(datetime.UTC)         # type: ignore
+    # commit changes
+    db.commit()
+    db.refresh(user)
+
+    return {"status": "success", "message": "User updated successfully", "id": user.id, "data": user}

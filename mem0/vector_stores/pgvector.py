@@ -10,7 +10,7 @@ try:
 except ImportError:
     raise ImportError("The 'psycopg2' library is required. Please install it using 'pip install psycopg2'.")
 
-from mem0.utils.qdrant_to_sql import convert_qdrant_filter_to_sql
+from mem0.utils.qdrant_to_sql import convert_qdrant_filter_to_sql, is_qdrant_filter_object, is_qdrant_like_filter, convert_dict_to_qdrant_filter
 from mem0.vector_stores.base import VectorStoreBase
 
 logger = logging.getLogger(__name__)
@@ -147,20 +147,42 @@ class PGVector(VectorStoreBase):
             query (str): Query - Not really used, this isn't a hybrid search.
             vectors (List[float]): Query vector - This is where the real money is hiding.
             limit (int, optional): Number of results to return. Defaults to 5.
-            filters (Dict, optional): Filters to apply to the search. Defaults to None. Supports flexible Qdrant-style filtering.
+            filters (Dict, optional): Filters to apply to the search. Defaults to None. Supports:
+                - qdrant.Filter objects
+                - Dictionaries with qdrant-like structure (must, must_not, should, should_not keys)
+                - Simple key/value dictionaries for equality filters on payload fields
 
         Returns:
             list: Search results.
         """
+        filter_conditions = []
         filter_params = []
-        filter_clause = ""
 
         if filters:
-            parsed_filters = convert_qdrant_filter_to_sql(filters)
-            filter_params.extend(parsed_filters['params'])
-            if parsed_filters['clause']:
-                filter_clause = "WHERE " + parsed_filters['clause']
-
+            if is_qdrant_filter_object(filters):
+                # Case 1: qdrant Filter object - use existing logic
+                parsed_filters = convert_qdrant_filter_to_sql(filters)
+                filter_params.extend(parsed_filters['params'])
+                filter_conditions.append(parsed_filters['clause'])
+            elif isinstance(filters, dict):
+                if is_qdrant_like_filter(filters):
+                    # Case 2: Dictionary with qdrant-like structure
+                    qdrant_filter = convert_dict_to_qdrant_filter(filters)
+                    parsed_filters = convert_qdrant_filter_to_sql(qdrant_filter)
+                    filter_params.extend(parsed_filters['params'])
+                    filter_conditions.append(parsed_filters['clause'])
+                else:
+                    # Case 3: Simple key/value dictionary
+                    for k, v in filters.items():
+                        filter_conditions.append("payload->>%s = %s")
+                        filter_params.extend([k, str(v)])
+            else:
+                # Fallback: try to use existing logic for backward compatibility
+                parsed_filters = convert_qdrant_filter_to_sql(filters)
+                filter_params.extend(parsed_filters['params'])
+                filter_conditions.append(parsed_filters['clause'])
+                
+        filter_clause = "WHERE " + " AND ".join(filter_conditions) if filter_conditions else ""
         offset_clause = f"OFFSET {(pageNumber - 1) * limit}" if pageNumber > 1 else ""
         self.cur.execute(
             f"""

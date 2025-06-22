@@ -80,9 +80,6 @@ async def add_memories(text: str, ctx: Context) -> str:
             # Get or create user and app
             user, app = get_user_and_app(db, user_id=uid, app_id=client_name)
 
-            if text.index("kaboom") == -1:
-                raise ValueError(text)
-
             # Check if app is active
             if not app.is_active:
                 return f"Error: App {app.name} is currently paused on OpenMemory. Cannot create new memories."

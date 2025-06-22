@@ -91,7 +91,7 @@ def parse_environment_variable_value(name, defaultValue: Any = None, expandSecre
         raw_value = os.environ.get(parts[1], defaultValue)
         if raw_value is not None:
             return raw_value  
-        logger.warning(f"Warning: Environment variable {parts[1]} not found, using a default value.")
+        logger.debug(f"Warning: Environment variable {parts[1]} not found, using a default value.")
         return defaultValue
     
     # Otherwise, this is not an environment variable, return it as-is
@@ -116,7 +116,7 @@ def parse_environment_variables(config_dict, expandSecrets: bool = True):
             # Make sure we don't have a null
             if workingValue is None:
                 # If the value is None, we do not copy it over
-                print(f"Warning: Environment variable for {key} is None, no defaultvalue available")
+                logger.debug(f"Warning: Environment variable for {key} is None, no defaultvalue available")
                 continue
             # If we made it this far, we can safely assign the value
             parsed_config[key] = workingValue
@@ -274,7 +274,7 @@ def get_default_memory_config(expandSecrets: bool = True) -> dict:
                 "diskann": parse_environment_variable_value("env:bool:PG_TIMESCALE", True, expandSecrets = expandSecrets)
             }
         else:
-            logger.warning(f"Warning - defaults have not been set for vector store provider {vectorProvider}, it will need to be manually configured before use.")
+            logger.debug(f"Warning - defaults have not been set for vector store provider {vectorProvider}, it will need to be manually configured before use.")
             
     # Graph Store
     if not graphProvider is None:
@@ -361,9 +361,9 @@ def get_parsed_memory_config(custom_instructions: str | None = None, expandSecre
                 _copy_from_db(config, mem0_config, "graph_store")                
             
             # All done!
-            logger.info("Configuration data has been successfully merged.")
+            logger.debug("Configuration data has been successfully merged.")
         else:       
-            logger.info("No saved configuration overides found, defaults will be used.")
+            logger.debug("No saved configuration overides found, defaults will be used.")
        
         # Fix Ollama URLs for Docker if needed
         if config["llm"].get("provider") == "ollama":

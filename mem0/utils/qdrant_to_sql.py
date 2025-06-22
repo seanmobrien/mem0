@@ -301,3 +301,112 @@ def _process_values_count_condition(
     
     clause = ' AND '.join(clauses) if clauses else ''
     return clause, params
+
+
+def is_qdrant_filter_object(filters):
+    """
+    Check if the filters parameter is a qdrant Filter object.
+    
+    Args:
+        filters: The filters parameter to check
+        
+    Returns:
+        bool: True if it's a qdrant Filter object, False otherwise
+    """
+    # Check for qdrant Filter object attributes
+    return hasattr(filters, 'model_dump') or hasattr(filters, 'dict')
+
+
+def is_qdrant_like_filter(filters_dict):
+    """
+    Check if dictionary can be interpreted as a qdrant filter.
+    
+    A dictionary is considered qdrant-like if:
+    - It contains qdrant filter keys (must, must_not, should, should_not)
+    - The values of these keys are lists
+    - The items in these lists are dictionaries with 'key' field (field conditions)
+    
+    Args:
+        filters_dict (dict): Dictionary to check
+        
+    Returns:
+        bool: True if it can be interpreted as a qdrant filter, False otherwise
+    """
+    if not isinstance(filters_dict, dict):
+        return False
+        
+    # Check if it has qdrant filter keys
+    qdrant_keys = {'must', 'must_not', 'should', 'should_not'}
+    if not any(key in filters_dict for key in qdrant_keys):
+        return False
+    
+    # Check if the values are lists and contain field-like conditions
+    for key in qdrant_keys:
+        if key in filters_dict:
+            if not isinstance(filters_dict[key], list):
+                return False
+            # Check if items in the list look like field conditions
+            for condition in filters_dict[key]:
+                if not isinstance(condition, dict):
+                    return False
+                # Should have 'key' field for field conditions
+                # or 'has_id' field for ID conditions
+                if 'key' not in condition and 'has_id' not in condition:
+                    return False
+    return True
+
+
+def convert_dict_to_qdrant_filter(filters_dict):
+    """
+    Convert a dictionary with qdrant-like structure to a qdrant Filter object.
+    
+    Args:
+        filters_dict (dict): Dictionary with qdrant-like structure
+        
+    Returns:
+        qdrant Filter object
+    """
+    # Convert dictionary conditions to qdrant objects
+    def convert_condition(condition_dict):
+        if 'has_id' in condition_dict:
+            # HasIdCondition
+            return models.HasIdCondition(has_id=condition_dict['has_id'])
+        elif 'key' in condition_dict:
+            # FieldCondition
+            key = condition_dict['key']
+            field_condition = models.FieldCondition(key=key)
+            
+            # Handle different condition types
+            if 'match' in condition_dict:
+                match = condition_dict['match']
+                if 'value' in match:
+                    field_condition.match = models.MatchValue(value=match['value'])
+                elif 'any' in match:
+                    field_condition.match = models.MatchAny(any=match['any'])
+            
+            if 'range' in condition_dict:
+                range_dict = condition_dict['range']
+                field_condition.range = models.Range(**range_dict)
+            
+            if 'is_empty' in condition_dict:
+                field_condition.is_empty = condition_dict['is_empty']
+            
+            if 'is_null' in condition_dict:
+                field_condition.is_null = condition_dict['is_null']
+            
+            if 'values_count' in condition_dict:
+                values_count = condition_dict['values_count']
+                field_condition.values_count = models.ValuesCount(**values_count)
+            
+            return field_condition
+        else:
+            raise ValueError(f"Invalid condition format: {condition_dict}")
+    
+    # Build the filter
+    filter_kwargs = {}
+    
+    for key in ['must', 'must_not', 'should', 'should_not']:
+        if key in filters_dict:
+            filter_kwargs[key] = [convert_condition(cond) for cond in filters_dict[key]]
+    
+    return models.Filter(**filter_kwargs)

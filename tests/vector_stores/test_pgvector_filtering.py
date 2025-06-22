@@ -273,7 +273,8 @@ class TestPGVectorFiltering(unittest.TestCase):
                     result = is_qdrant_like_filter(case)
                     # For empty lists, this is still a valid qdrant-like structure
                     if any(isinstance(v, list) and len(v) == 0 for v in case.values()):
-                        self.assertTrue(result or not result)  # Either way is acceptable
+                        # Empty lists are valid qdrant-like structures
+                        self.assertTrue(result, f"Expected True for case {case} with empty lists")
                 except Exception as e:
                     self.fail(f"Should not raise exception for {case}: {e}")
 

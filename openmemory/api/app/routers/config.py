@@ -73,7 +73,7 @@ def save_config_to_db(db: Session, config: Dict[str, Any] | ConfigSchema, key: s
     validated = ConfigSchema.model_validate(config)
     if not validated:
         raise HTTPException(status_code=400, detail="Invalid or missing configuration detected")
-    serializable = dict[str,Any](validated.model_dump(exclude_none=True, exclude_unset=True))
+    serializable = dict(validated.model_dump(exclude_none=True, exclude_unset=True))
         
     db_config = db.query(ConfigModel).filter(ConfigModel.key == key).first()    
     if db_config:

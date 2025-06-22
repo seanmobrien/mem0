@@ -9,7 +9,6 @@ import json
 import hashlib
 
 from mem0 import Memory
-from app.database import SessionLocal
 from app.models import Config as ConfigModel
 from app.utils.client_config_factory import get_parsed_memory_config
 

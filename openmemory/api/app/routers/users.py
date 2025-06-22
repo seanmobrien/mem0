@@ -74,8 +74,8 @@ async def create_user(
         raise HTTPException(status_code=400, detail="App name cannot be empty")
     # Check if user exists
     user = db.query(User).filter(User.user_id == user_id or User.id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=401, detail="Username already exists")
+    if user:
+        raise HTTPException(status_code=409, detail="Username already exists")
     # Check if app with this name already exists    
     new_user = User(
         name=name, 

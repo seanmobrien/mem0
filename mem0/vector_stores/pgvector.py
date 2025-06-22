@@ -10,7 +10,12 @@ try:
 except ImportError:
     raise ImportError("The 'psycopg2' library is required. Please install it using 'pip install psycopg2'.")
 
-from mem0.utils.qdrant_to_sql import convert_qdrant_filter_to_sql, is_qdrant_filter_object, is_qdrant_like_filter, convert_dict_to_qdrant_filter
+from mem0.utils.qdrant_to_sql import (
+    convert_qdrant_filter_to_sql,
+    is_qdrant_filter_object,
+    is_qdrant_like_filter,
+    convert_dict_to_qdrant_filter,
+)
 from mem0.vector_stores.base import VectorStoreBase
 
 logger = logging.getLogger(__name__)
@@ -85,7 +90,7 @@ class PGVector(VectorStoreBase):
         if not self._is_extension_installed("vector"):
             logger.info("Creating vector extension in PostgreSQL...")
             self.cur.execute("CREATE EXTENSION vector")
-        
+
         self.cur.execute(
             f"""
             CREATE TABLE IF NOT EXISTS {self.collection_name} (
@@ -139,7 +144,51 @@ class PGVector(VectorStoreBase):
         )
         self.conn.commit()
 
-    def search(self, query, vectors, limit=5, filters=None, pageNumber = 1):
+    def _process_filters(self, filters):
+        """
+        Process filters and return filter conditions and parameters.
+
+        Supports multiple filter formats:
+        - qdrant.Filter objects
+        - Dictionaries with qdrant-like structure (must, must_not, should, should_not keys)
+        - Simple key/value dictionaries for equality filters on payload fields
+
+        Args:
+            filters: Filters to process
+
+        Returns:
+            tuple: (filter_conditions, filter_params)
+        """
+        filter_conditions = []
+        filter_params = []
+
+        if filters:
+            if is_qdrant_filter_object(filters):
+                # Case 1: qdrant Filter object - use existing logic
+                parsed_filters = convert_qdrant_filter_to_sql(filters)
+                filter_params.extend(parsed_filters["params"])
+                filter_conditions.append(parsed_filters["clause"])
+            elif isinstance(filters, dict):
+                if is_qdrant_like_filter(filters):
+                    # Case 2: Dictionary with qdrant-like structure
+                    qdrant_filter = convert_dict_to_qdrant_filter(filters)
+                    parsed_filters = convert_qdrant_filter_to_sql(qdrant_filter)
+                    filter_params.extend(parsed_filters["params"])
+                    filter_conditions.append(parsed_filters["clause"])
+                else:
+                    # Case 3: Simple key/value dictionary
+                    for k, v in filters.items():
+                        filter_conditions.append("payload->>%s = %s")
+                        filter_params.extend([k, str(v)])
+            else:
+                # Fallback: try to use existing logic for backward compatibility
+                parsed_filters = convert_qdrant_filter_to_sql(filters)
+                filter_params.extend(parsed_filters["params"])
+                filter_conditions.append(parsed_filters["clause"])
+
+        return filter_conditions, filter_params
+
+    def search(self, query, vectors, limit=5, filters=None, pageNumber=1):
         """
         Search for similar vectors.
 
@@ -155,33 +204,8 @@ class PGVector(VectorStoreBase):
         Returns:
             list: Search results.
         """
-        filter_conditions = []
-        filter_params = []
+        filter_conditions, filter_params = self._process_filters(filters)
 
-        if filters:
-            if is_qdrant_filter_object(filters):
-                # Case 1: qdrant Filter object - use existing logic
-                parsed_filters = convert_qdrant_filter_to_sql(filters)
-                filter_params.extend(parsed_filters['params'])
-                filter_conditions.append(parsed_filters['clause'])
-            elif isinstance(filters, dict):
-                if is_qdrant_like_filter(filters):
-                    # Case 2: Dictionary with qdrant-like structure
-                    qdrant_filter = convert_dict_to_qdrant_filter(filters)
-                    parsed_filters = convert_qdrant_filter_to_sql(qdrant_filter)
-                    filter_params.extend(parsed_filters['params'])
-                    filter_conditions.append(parsed_filters['clause'])
-                else:
-                    # Case 3: Simple key/value dictionary
-                    for k, v in filters.items():
-                        filter_conditions.append("payload->>%s = %s")
-                        filter_params.extend([k, str(v)])
-            else:
-                # Fallback: try to use existing logic for backward compatibility
-                parsed_filters = convert_qdrant_filter_to_sql(filters)
-                filter_params.extend(parsed_filters['params'])
-                filter_conditions.append(parsed_filters['clause'])
-                
         filter_clause = "WHERE " + " AND ".join(filter_conditions) if filter_conditions else ""
         offset_clause = f"OFFSET {(pageNumber - 1) * limit}" if pageNumber > 1 else ""
         self.cur.execute(
@@ -289,20 +313,17 @@ class PGVector(VectorStoreBase):
         List all vectors in a collection.
 
         Args:
-            filters (Dict, optional): Filters to apply to the list. Defaults to None. Supports flexible Qdrant-style filtering.
+            filters (Dict, optional): Filters to apply to the list. Defaults to None. Supports:
+                - qdrant.Filter objects
+                - Dictionaries with qdrant-like structure (must, must_not, should, should_not keys)
+                - Simple key/value dictionaries for equality filters on payload fields
             limit (int, optional): Number of vectors to return. Defaults to 100.
 
         Returns:
             List[OutputData]: List of vectors.
         """
-        filter_params = []
-        filter_clause = ""
-
-        if filters:
-            parsed_filters = convert_qdrant_filter_to_sql(filters)
-            filter_params.extend(parsed_filters['params'])
-            if parsed_filters['clause']:
-                filter_clause = "WHERE " + parsed_filters['clause']
+        filter_conditions, filter_params = self._process_filters(filters)
+        filter_clause = "WHERE " + " AND ".join(filter_conditions) if filter_conditions else ""
 
         query = f"""
             SELECT id, vector, payload

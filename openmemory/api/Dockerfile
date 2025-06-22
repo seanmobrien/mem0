@@ -62,10 +62,13 @@ COPY --link=true openmemory/api/ .
 RUN chown -R appuser:appuser /usr/src/openmemory
 USER appuser
 
+# Set default log level (can be overridden with environment variable)
+ENV LOG_LEVEL=warning
+
 EXPOSE 8765
 
 # Add health check for container orchestration
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD curl -f http://localhost:8765/api/v1/stats/health-check || exit 1
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8765", "--no-server-header", "--forwarded-allow-ips", "*", "--log-level", "info"]
+CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port 8765 --no-server-header --forwarded-allow-ips '*' --log-level ${LOG_LEVEL}"]

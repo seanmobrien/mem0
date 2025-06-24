@@ -813,7 +813,8 @@ class Memory(MemoryBase):
         metadata = metadata or {}
         metadata["data"] = data
         metadata["hash"] = hashlib.md5(data.encode()).hexdigest()
-        metadata["created_at"] = datetime.now(pytz.timezone("US/Pacific")).isoformat()
+        if ("created_at" not in metadata) or (metadata["created_at"] is None):
+            metadata["created_at"] = datetime.now(pytz.timezone("US/Pacific")).isoformat()
 
         self.vector_store.insert(
             vectors=[embeddings],
@@ -1672,7 +1673,8 @@ class AsyncMemory(MemoryBase):
         metadata = metadata or {}
         metadata["data"] = data
         metadata["hash"] = hashlib.md5(data.encode()).hexdigest()
-        metadata["created_at"] = datetime.now(pytz.timezone("US/Pacific")).isoformat()
+        if ("created_at" not in metadata) or (metadata["created_at"] is None):
+            metadata["created_at"] = datetime.now(pytz.timezone("US/Pacific")).isoformat()
 
         await asyncio.to_thread(
             self.vector_store.insert,

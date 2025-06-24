@@ -61,7 +61,9 @@ sse = SseServerTransport("/mcp/messages/")
 
 @mcp.tool(description="Add a new memory. This method is called everytime the user informs anything about themselves, their preferences, or anything that has any relevant information which can be useful in the future conversation. This can also be called when the user asks you to remember something.  " +
           "Metadata can be provided to store additional information that can be useful for filtering or categorizing memories later.  Any arbitrary metadata can be provided, but some special keys include - 'created_at': when present, this will be used as the memory creation date.  This should always be set to the send date of the analyzed document.  'chat_thread': the thread ID of the chat where this message was sent.")
-async def add_memories(text: str, metadata: Mapping[str, Any] = {}) -> str | Mapping[str, str | List[Any] | Mapping[str, Any]]:
+async def add_memories(text: str, metadata: Mapping[str, Any] = None) -> str | Mapping[str, str | List[Any] | Mapping[str, Any]]:
+    if metadata is None:
+        metadata = {}
     logging.info("Add Memory called with text: %s", text)
     uid = user_id_var.get(None)
     client_name = client_name_var.get(None)

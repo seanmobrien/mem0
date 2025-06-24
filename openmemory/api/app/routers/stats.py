@@ -262,7 +262,7 @@ async def health_check(
     return {
         "status": "ok", 
         "message": "API is running smoothly.", 
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "service": "openmemory-api",
         "mem0": get_mem0_build_info(verbose == 1),
         "details": {

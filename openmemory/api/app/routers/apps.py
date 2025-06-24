@@ -2,8 +2,9 @@ from typing import Optional
 import datetime
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query
+import sqlalchemy
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import func, desc
+from sqlalchemy import func, desc, sql
 
 from app.database import get_db
 from app.models import User, App, Memory, MemoryAccessLog, MemoryState
@@ -103,7 +104,7 @@ async def list_apps(
 async def get_app_details(
     app_id: UUID,
     db: Session = Depends(get_db)
-):
+) -> dict:
     app = get_app_or_404(db, app_id)
 
     # Get memory access statistics
@@ -118,9 +119,9 @@ async def get_app_details(
         "total_memories_created": db.query(Memory)
             .filter(Memory.app_id == app_id)
             .count(),
-        "total_memories_accessed": access_stats.total_memories_accessed or 0,
-        "first_accessed": access_stats.first_accessed,
-        "last_accessed": access_stats.last_accessed
+        "total_memories_accessed": access_stats.total_memories_accessed or 0, # type: ignore
+        "first_accessed": access_stats.first_accessed, # type: ignore
+        "last_accessed": access_stats.last_accessed # type: ignore
     }
 
 # List memories created by app
@@ -216,10 +217,20 @@ async def list_app_accessed_memories(
 async def update_app_details(
     app_id: UUID,
     is_active: bool,
+    description: Optional[str] = None,
+    metadata: Optional[dict] = None,
     db: Session = Depends(get_db)
 ):
     app = get_app_or_404(db, app_id)
-    app.is_active = is_active
+    app.is_active = is_active # type: ignore
+    if (description is not None):
+        app.description = description # type: ignore
+    if (metadata is not None):        
+        if not isinstance(metadata, dict):
+            raise HTTPException(status_code=400, detail="Metadata must be a dictionary")
+        existing_metadata = app.metadata_ if app.metadata_ is not None else {}
+        app.metadata_ = {**existing_metadata, **metadata} # type: ignore        
+    app.updated_at = datetime.datetime.now(datetime.timezone.utc) # type: ignore
     db.commit()
     return {"status": "success", "message": "Updated app details successfully"}
 
@@ -227,7 +238,9 @@ async def update_app_details(
 async def create_app(
     name: str,
     owner: str,
+    description: Optional[str] = None,
     is_active: bool = True,
+    metadata: Optional[dict] = None,
     db: Session = Depends(get_db)
 ):
     # Validate input
@@ -235,19 +248,25 @@ async def create_app(
         raise HTTPException(status_code=400, detail="App name cannot be empty")
     if not owner:
         raise HTTPException(status_code=400, detail="Owner cannot be empty")
-    # Check if user exists
-    user = db.query(User).filter(User.name == owner or User.id == owner).first()
-    if not user:
+    # Check if user exists and retrieve id
+    userId = db.execute(
+        sql.select(User.id).where(User.user_id == owner)
+    ).scalars().first()
+    if userId is None:
         raise HTTPException(status_code=404, detail="Owner not found")
-    # Check if app with this name already exists
-    existing_app = db.query(App).filter(App.name == name).first()
+    # Make sure we don't already have an app with this name
+    existing_app = db.execute(
+        sql.select(App.id).where(App.name == name, App.owner_id == userId)
+    ).scalars().first()
     if existing_app:
         raise HTTPException(status_code=400, detail="App with this name already exists")
-
+    # Create new record
     new_app = App(
         name=name, 
         is_active=is_active,
-        owner_id=owner,
+        owner_id=userId,
+        description=description,
+        metadata_= metadata or {},
         created_at=datetime.datetime.now(datetime.timezone.utc),
         updated_at=datetime.datetime.now(datetime.timezone.utc),
     )

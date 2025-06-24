@@ -76,11 +76,11 @@ async def create_user(
         raise HTTPException(status_code=400, detail="User ID cannot be empty")
     # Check if user exists
     # Check if user exists and retrieve id
-    userId = db.execute(
+    db_user_id = db.execute(
         sql.select(User.id).where(User.user_id == user_id)
     ).scalars().first()
-    if userId:
-        raise HTTPException(status_code=409, detail="Username already exists")
+    if db_user_id:
+        raise HTTPException(status_code=409, detail="User already exists")
     # Create record
     new_user = User(
         name=name, 

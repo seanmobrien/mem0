@@ -98,7 +98,7 @@ async def add_memories(text: str, metadata: Mapping[str, Any] = None) -> str | M
             response = memory_client.add(text,
                                          user_id=uid,
                                          metadata=meta)
-            memoryTimestamp = datetime.datetime.fromisoformat(meta.pop('created_at', datetime.datetime.now(datetime.UTC).isoformat()))
+            memory_timestamp = datetime.datetime.fromisoformat(meta.pop('created_at', datetime.datetime.now(datetime.UTC).isoformat()))
 
             # Process the response and update database
             if isinstance(response, dict) and 'results' in response:
@@ -113,7 +113,7 @@ async def add_memories(text: str, metadata: Mapping[str, Any] = None) -> str | M
                                 user_id=user.id,
                                 app_id=app.id,
                                 metadata=meta,
-                                created_at=memoryTimestamp,
+                                created_at=memory_timestamp,
                                 content=result['memory'],
                                 state=MemoryState.active
                             )
@@ -126,7 +126,7 @@ async def add_memories(text: str, metadata: Mapping[str, Any] = None) -> str | M
                         history = MemoryStatusHistory(
                             memory_id=memory_id,
                             changed_by=user.id,
-                            changed_at=memoryTimestamp,
+                            changed_at=memory_timestamp ,
                             old_state=MemoryState.deleted if memory else None,
                             new_state=MemoryState.active
                         )

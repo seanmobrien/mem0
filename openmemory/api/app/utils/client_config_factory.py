@@ -363,7 +363,7 @@ def get_parsed_memory_config(custom_instructions: str | None = None, expandSecre
             # All done!
             logger.debug("Configuration data has been successfully merged.")
         else:       
-            logger.debug("No saved configuration overides found, defaults will be used.")
+            logger.debug("No saved configuration overrides found, defaults will be used.")
        
         # Fix Ollama URLs for Docker if needed
         if config["llm"].get("provider") == "ollama":

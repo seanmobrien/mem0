@@ -17,6 +17,7 @@ Key features:
 
 import logging
 import json
+from typing import Any, Dict, List, Mapping
 from mcp.server.fastmcp import FastMCP, Context
 from mcp.server.sse import SseServerTransport
 from app.utils.memory import get_memory_client
@@ -58,21 +59,25 @@ mcp_router = APIRouter(prefix="/mcp")
 # Initialize SSE transport
 sse = SseServerTransport("/mcp/messages/")
 
-@mcp.tool(description="Add a new memory. This method is called everytime the user informs anything about themselves, their preferences, or anything that has any relevant information which can be useful in the future conversation. This can also be called when the user asks you to remember something.")
-async def add_memories(text: str, ctx: Context) -> str:
+@mcp.tool(description="Add a new memory. This method is called everytime the user informs anything about themselves, their preferences, or anything that has any relevant information which can be useful in the future conversation. This can also be called when the user asks you to remember something.  " +
+          "Metadata can be provided to store additional information that can be useful for filtering or categorizing memories later.  Any arbitrary metadata can be provided, but some special keys include - 'created_at': when present, this will be used as the memory creation date.  This should always be set to the send date of the analyzed document.  'chat_thread': the thread ID of the chat where this message was sent.")
+async def add_memories(text: str, metadata: Mapping[str, Any] = None) -> str | Mapping[str, str | List[Any] | Mapping[str, Any]]:
+    if metadata is None:
+        metadata = {}
     logging.info("Add Memory called with text: %s", text)
     uid = user_id_var.get(None)
     client_name = client_name_var.get(None)
 
     if not uid:
-        return "Error: user_id not provided"
+        raise AssertionError("Error: user_id not provided")
     if not client_name:
-        return "Error: client_name not provided"
+        raise AssertionError("Error: client_name not provided")
 
     # Get memory client safely
     memory_client = get_memory_client_safe()
     if not memory_client:
-        return "Error: Memory system is currently unavailable. Please try again later."
+        raise AssertionError("Memory system is currently unavailable. Please try again later.")
+        
 
     try:
         db = SessionLocal()
@@ -82,14 +87,18 @@ async def add_memories(text: str, ctx: Context) -> str:
 
             # Check if app is active
             if not app.is_active:
-                return f"Error: App {app.name} is currently paused on OpenMemory. Cannot create new memories."
+                raise ValueError(f"Error: App {app.name} is currently paused on OpenMemory. Cannot create new memories.")
+
+            default_metadata = {
+                "source_app": "openmemory",
+                "mcp_client": client_name,
+            }
+            meta = { **default_metadata, **(metadata or {}) }
 
             response = memory_client.add(text,
                                          user_id=uid,
-                                         metadata={
-                                            "source_app": "openmemory",
-                                            "mcp_client": client_name,
-                                        })
+                                         metadata=meta)
+            memory_timestamp = datetime.datetime.fromisoformat(meta.pop('created_at', datetime.datetime.now(datetime.UTC).isoformat()))
 
             # Process the response and update database
             if isinstance(response, dict) and 'results' in response:
@@ -103,6 +112,8 @@ async def add_memories(text: str, ctx: Context) -> str:
                                 id=memory_id,
                                 user_id=user.id,
                                 app_id=app.id,
+                                metadata=meta,
+                                created_at=memory_timestamp,
                                 content=result['memory'],
                                 state=MemoryState.active
                             )
@@ -115,6 +126,7 @@ async def add_memories(text: str, ctx: Context) -> str:
                         history = MemoryStatusHistory(
                             memory_id=memory_id,
                             changed_by=user.id,
+                            changed_at=memory_timestamp ,
                             old_state=MemoryState.deleted if memory else None,
                             new_state=MemoryState.active
                         )
@@ -138,6 +150,12 @@ async def add_memories(text: str, ctx: Context) -> str:
             return response
         finally:
             db.close()
+    except AssertionError as e:
+        logging.exception(f"Error adding to memory: {e}")
+        raise e
+    except ValueError as e:
+        logging.exception(f"Error adding to memory: {e}")
+        raise e
     except Exception as e:
         logging.exception(f"Error adding to memory: {e}")
         raise MemoryError(f"Error adding to memory: {e}")
@@ -150,14 +168,14 @@ async def search_memory(query: str, numberOfHits = 10, page = 1) -> str:
     uid = user_id_var.get(None)
     client_name = client_name_var.get(None)
     if not uid:
-        return "Error: user_id not provided"
+        raise AssertionError("Error: user_id not provided")
     if not client_name:
-        return "Error: client_name not provided"
+        raise AssertionError("Error: client_name not provided")
 
     # Get memory client safely
     memory_client = get_memory_client_safe()
     if not memory_client:
-        return "Error: Memory system is currently unavailable. Please try again later."
+        raise AssertionError("Error: Memory system is currently unavailable. Please try again later.")
 
     try:
         db = SessionLocal()
@@ -240,6 +258,12 @@ async def search_memory(query: str, numberOfHits = 10, page = 1) -> str:
             return json.dumps(memories, indent=2)
         finally:
             db.close()
+    except AssertionError as e:
+        logging.exception(f"Error searching memory: {e}")
+        raise e
+    except ValueError as e:
+        logging.exception(f"Error searching memory: {e}")
+        raise ValueError(f"Error searching memory: {e}")
     except Exception as e:
         logging.exception(e)
         raise MemoryError(f"Error searching memory: {e}")
@@ -250,14 +274,14 @@ async def list_memories() -> str:
     uid = user_id_var.get(None)
     client_name = client_name_var.get(None)
     if not uid:
-        return "Error: user_id not provided"
+        raise AssertionError("Error: user_id not provided")
     if not client_name:
-        return "Error: client_name not provided"
+        raise AssertionError("Error: client_name not provided")
 
     # Get memory client safely
     memory_client = get_memory_client_safe()
     if not memory_client:
-        return "Error: Memory system is currently unavailable. Please try again later."
+        raise AssertionError("Error: Memory system is currently unavailable. Please try again later.")
 
     try:
         db = SessionLocal()
@@ -309,6 +333,12 @@ async def list_memories() -> str:
             return json.dumps(filtered_memories, indent=2)
         finally:
             db.close()
+    except AssertionError as e:
+        logging.exception(f"Error getting memories: {e}")
+        raise e
+    except ValueError as e:
+        logging.exception(f"Error getting memories: {e}")
+        raise ValueError(f"Error getting memories: {e}")
     except Exception as e:
         logging.exception(f"Error getting memories: {e}")
         raise MemoryError(f"Error searching memory: {e}")
@@ -320,14 +350,14 @@ async def delete_all_memories() -> str:
     uid = user_id_var.get(None)
     client_name = client_name_var.get(None)
     if not uid:
-        return "Error: user_id not provided"
+        raise AssertionError("Error: user_id not provided")
     if not client_name:
-        return "Error: client_name not provided"
+        raise AssertionError("Error: client_name not provided")
 
     # Get memory client safely
     memory_client = get_memory_client_safe()
     if not memory_client:
-        return "Error: Memory system is currently unavailable. Please try again later."
+        raise AssertionError("Error: Memory system is currently unavailable. Please try again later.")
 
     try:
         db = SessionLocal()
@@ -375,6 +405,12 @@ async def delete_all_memories() -> str:
             return "Successfully deleted all memories"
         finally:
             db.close()
+    except AssertionError as e:
+        logging.exception(f"Error deleting memories: {e}")
+        raise e
+    except ValueError as e:
+        logging.exception(f"Error deleting memories: {e}")
+        raise ValueError(f"Error deleting memories: {e}")
     except Exception as e:
         logging.exception(f"Error deleting memories: {e}")
         raise MemoryError(f"Error deleting memories: {e}")

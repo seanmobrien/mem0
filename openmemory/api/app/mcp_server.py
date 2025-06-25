@@ -32,7 +32,9 @@ from app.utils.db import get_user_and_app
 import uuid
 import datetime
 from app.utils.permissions import check_memory_access_permissions
+from app.utils.memory_client import search_memories, log_memory_access
 from qdrant_client import models as qdrant_models
+from typing import Union
 
 # Load environment variables
 load_dotenv()
@@ -163,7 +165,7 @@ async def add_memories(text: str, metadata: Mapping[str, Any] = None) -> str | M
 
 
 @mcp.tool(description="Peforms a vector Search through stored memories. This method is called EVERYTIME the user asks anything.  Supports pagination if more context is necessary, but pay attention to the result score.")
-async def search_memory(query: str, numberOfHits = 10, page = 1) -> str:
+async def search_memory(query: str, numberOfHits = 10, page = 1, filters: Union[qdrant_models.Filter, dict, None] = None) -> str:
     logging.info("Search Memory called with query: %s", query)
     uid = user_id_var.get(None)
     client_name = client_name_var.get(None)
@@ -172,92 +174,27 @@ async def search_memory(query: str, numberOfHits = 10, page = 1) -> str:
     if not client_name:
         raise AssertionError("Error: client_name not provided")
 
-    # Get memory client safely
-    memory_client = get_memory_client_safe()
-    if not memory_client:
-        raise AssertionError("Error: Memory system is currently unavailable. Please try again later.")
-
     try:
-        db = SessionLocal()
-        try:
-            # Get or create user and app
-            user, app = get_user_and_app(db, user_id=uid, app_id=client_name)
-
-            # Get accessible memory IDs based on ACL
-            user_memories = db.query(Memory).filter(Memory.user_id == user.id).all()
-            accessible_memory_ids = [memory.id for memory in user_memories if check_memory_access_permissions(db, memory, app.id)]
-            
-            conditions = [qdrant_models.FieldCondition(key="user_id", match=qdrant_models.MatchValue(value=uid))]
-            
-            if accessible_memory_ids:
-                # Convert UUIDs to strings for Qdrant
-                accessible_memory_ids_str = [str(memory_id) for memory_id in accessible_memory_ids]
-                conditions.append(qdrant_models.HasIdCondition(has_id=accessible_memory_ids_str))
-
-            filters = qdrant_models.Filter(must=conditions)
-            embeddings = memory_client.embedding_model.embed(query, "search")
-                        
-            hits = memory_client.vector_store.search(
-                query,                      # search query, also not actually used
-                embeddings,                 # This is where the real magic is
-                numberOfHits,                   # Limit the number of results   
-                filters,             # Filter to only include memories accessible by the user
-                page                 # And provide for pagination support 
-            )
-			
-
-            # Process search results
-            memories = hits
-            memories = [
-                {
-                    "id": memory.id,
-                    "memory": memory.payload["data"],
-                    "hash": memory.payload.get("hash"),
-                    "created_at": memory.payload.get("created_at"),
-                    "updated_at": memory.payload.get("updated_at"),
-                    "score": memory.score,
-                }
-                for memory in memories
-            ]
-
-            # Log memory access for each memory found
-            if isinstance(memories, dict) and 'results' in memories:
-                print(f"Memories: {memories}")
-                for memory_data in memories['results']:
-                    if 'id' in memory_data:
-                        memory_id = uuid.UUID(memory_data['id'])
-                        # Create access log entry
-                        access_log = MemoryAccessLog(
-                            memory_id=memory_id,
-                            app_id=app.id,
-                            access_type="search",
-                            metadata_={
-                                "query": query,
-                                "score": memory_data.get('score'),
-                                "hash": memory_data.get('hash')
-                            }
-                        )
-                        db.add(access_log)
-                db.commit()
-            else:
-                for memory in memories:
-                    memory_id = uuid.UUID(memory['id'])
-                    # Create access log entry
-                    access_log = MemoryAccessLog(
-                        memory_id=memory_id,
-                        app_id=app.id,
-                        access_type="search",
-                        metadata_={
-                            "query": query,
-                            "score": memory.get('score'),
-                            "hash": memory.get('hash')
-                        }
-                    )
-                    db.add(access_log)
-                db.commit()
-            return json.dumps(memories, indent=2)
-        finally:
-            db.close()
+        # Use the reusable search function
+        memories = await search_memories(
+            query=query,
+            user_id=uid,
+            app_id=client_name,
+            numberOfHits=numberOfHits,
+            page=page,
+            filters=filters
+        )
+        
+        # Log memory access
+        await log_memory_access(
+            memories=memories,
+            user_id=uid,
+            app_id=client_name,
+            query=query,
+            access_type="search"
+        )
+        
+        return json.dumps(memories, indent=2)
     except AssertionError as e:
         logging.exception(f"Error searching memory: {e}")
         raise e

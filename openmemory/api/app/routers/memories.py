@@ -1,5 +1,5 @@
 from datetime import datetime, UTC
-from typing import List, Optional, Set
+from typing import List, Optional, Set, Union
 from uuid import UUID, uuid4
 import logging
 import os
@@ -10,6 +10,8 @@ from fastapi_pagination.ext.sqlalchemy import paginate as sqlalchemy_paginate
 from pydantic import BaseModel
 from sqlalchemy import or_, func
 from app.utils.memory import get_memory_client
+from app.utils.memory_client import search_memories, log_memory_access
+from qdrant_client import models as qdrant_models
 
 from app.database import get_db
 from app.models import (
@@ -578,6 +580,64 @@ async def filter_memories(
             for memory in items
         ]
     )
+
+
+class SearchMemoriesRequest(BaseModel):
+    query: str
+    user_id: str
+    numberOfHits: int = 10
+    page: int = 1
+    filters: Optional[Union[dict, None]] = None
+    
+
+# Search memories endpoint
+@router.post("/search")
+async def search_memories_endpoint(
+    request: SearchMemoriesRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Search memories using vector similarity search.
+    
+    This endpoint accepts the same parameters as the MCP search_memory function
+    and uses the reusable search logic from memory_client.py.
+    """
+    user = db.query(User).filter(User.user_id == request.user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Default app for API requests
+    app_id = "openmemory"
+    
+    try:
+        # Use the reusable search function
+        memories = await search_memories(
+            query=request.query,
+            user_id=request.user_id,
+            app_id=app_id,
+            numberOfHits=request.numberOfHits,
+            page=request.page,
+            filters=request.filters
+        )
+        
+        # Log memory access
+        await log_memory_access(
+            memories=memories,
+            user_id=request.user_id,
+            app_id=app_id,
+            query=request.query,
+            access_type="search"
+        )
+        
+        return {
+            "results": memories,
+            "query": request.query,
+            "page": request.page,
+            "total": len(memories)
+        }
+    except Exception as e:
+        logging.exception(f"Error in search endpoint: {e}")
+        raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")
 
 
 @router.get("/{memory_id}/related", response_model=Page[MemoryResponse])

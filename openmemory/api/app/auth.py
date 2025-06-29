@@ -26,6 +26,9 @@ KEYCLOAK_REALM = os.getenv("KEYCLOAK_REALM", "openmemory")
 KEYCLOAK_CLIENT_ID = os.getenv("KEYCLOAK_CLIENT_ID", "openmemory-api")
 KEYCLOAK_CLIENT_SECRET = os.getenv("KEYCLOAK_CLIENT_SECRET", "")
 
+# Feature flag for authentication (can be disabled for development)
+AUTH_ENABLED = os.getenv("AUTH_ENABLED", "true").lower() in ("true", "1", "yes", "on")
+
 # Cache for Keycloak configuration
 _keycloak_openid: Optional[KeycloakOpenID] = None
 _jwks_cache: Optional[Dict[str, Any]] = None
@@ -117,6 +120,15 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
     Raises:
         HTTPException: If authentication fails
     """
+    if not AUTH_ENABLED:
+        # Return a default user for development when auth is disabled
+        return {
+            "sub": "dev-user",
+            "preferred_username": "dev-user",
+            "email": "dev@example.com",
+            "name": "Development User"
+        }
+    
     token = credentials.credentials
     return verify_token(token)
 
@@ -189,6 +201,9 @@ def get_user_id(current_user: Dict[str, Any] = Depends(get_current_user)) -> str
     Returns:
         User ID string
     """
+    if not AUTH_ENABLED:
+        return current_user.get("preferred_username", "dev-user")
+    
     user_id = current_user.get("sub") or current_user.get("preferred_username")
     if not user_id:
         raise HTTPException(
@@ -206,6 +221,13 @@ def check_auth_service_health() -> Dict[str, Any]:
     Returns:
         Dict with health status information
     """
+    if not AUTH_ENABLED:
+        return {
+            "healthy": True,
+            "enabled": False,
+            "message": "Authentication is disabled"
+        }
+    
     try:
         # Try to get well-known configuration
         well_known_url = f"{KEYCLOAK_SERVER_URL}/realms/{KEYCLOAK_REALM}/.well-known/openid_configuration"
@@ -214,6 +236,7 @@ def check_auth_service_health() -> Dict[str, Any]:
         
         return {
             "healthy": True,
+            "enabled": True,
             "server_url": KEYCLOAK_SERVER_URL,
             "realm": KEYCLOAK_REALM,
             "client_id": KEYCLOAK_CLIENT_ID
@@ -221,6 +244,7 @@ def check_auth_service_health() -> Dict[str, Any]:
     except Exception as e:
         return {
             "healthy": False,
+            "enabled": True,
             "error": str(e),
             "server_url": KEYCLOAK_SERVER_URL,
             "realm": KEYCLOAK_REALM

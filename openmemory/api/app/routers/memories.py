@@ -115,8 +115,12 @@ async def list_memories(
     sort_column: Optional[str] = Query(None, description="Column to sort by (memory, categories, app_name, created_at)"),
     sort_direction: Optional[str] = Query(None, description="Sort direction (asc or desc)"),
     db: Session = Depends(get_db),
-    user_id: str = Depends(get_user_id)
+    current_user: dict = Depends(get_current_user)
 ):
+    # Extract user_id from authenticated user
+    user_id = current_user.get("sub") or current_user.get("preferred_username")
+    if not user_id:
+        raise HTTPException(status_code=400, detail="User ID not found in token")
     user = db.query(User).filter(User.user_id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")

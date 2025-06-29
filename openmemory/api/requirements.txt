@@ -17,6 +17,11 @@ tenacity==9.1.2
 anthropic==0.51.0
 ollama==0.4.8
 
+# Authentication dependencies
+python-jose[cryptography]>=3.3.0
+python-keycloak>=2.6.0
+requests>=2.25.0
+
 # Graph dependencies (mem0ai optional dependencies)
 langchain-neo4j>=0.4.0
 neo4j>=5.23.1

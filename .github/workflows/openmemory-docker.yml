@@ -22,6 +22,7 @@ env:
   API_IMAGE_NAME: openmemory-api
   UI_IMAGE_NAME: openmemory-ui
   SRV_IMAGE_NAME: openmemory-mem0
+  KEYCLOAK_IMAGE_NAME: openmemory-keycloak
 
 jobs:
   check_changes:
@@ -61,6 +62,10 @@ jobs:
             dockerfile: openmemory/ui/Dockerfile
             context: openmemory/ui
             image: openmemory-ui
+          - service: keycloak
+            dockerfile: openmemory/keycloak/Dockerfile
+            context: openmemory/keycloak
+            image: openmemory-keycloak
           - service: mem0
             dockerfile: server/Dockerfile
             context: server

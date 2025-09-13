@@ -8,7 +8,7 @@ on:
     paths:
       - 'openmemory/**'
       - 'server/**'
-      - 'pgvector/**'
+      # - 'pgvector/**'
       - 'mem0/**'
       - 'pyproject.toml'
       - 'build_local.py'
@@ -39,7 +39,7 @@ jobs:
         with:
           filters: |
             openmemory:
-              - '{openmemory,server,pgvector,mem0}/**'
+              - '{openmemory,server,mem0}/**'
               - 'pyproject.toml'
               - 'build_local.py'
 

@@ -8,7 +8,7 @@ on:
     paths:
       - 'openmemory/**'
       - 'server/**'
-      - 'pgvector/**'
+      # - 'pgvector/**'
       - 'mem0/**'
       - 'pyproject.toml'
       - 'build_local.py'
@@ -22,6 +22,7 @@ env:
   API_IMAGE_NAME: openmemory-api
   UI_IMAGE_NAME: openmemory-ui
   SRV_IMAGE_NAME: openmemory-mem0
+  KEYCLOAK_IMAGE_NAME: openmemory-keycloak
 
 jobs:
   check_changes:
@@ -38,7 +39,7 @@ jobs:
         with:
           filters: |
             openmemory:
-              - '{openmemory,server,pgvector,mem0}/**'
+              - '{openmemory,server,mem0}/**'
               - 'pyproject.toml'
               - 'build_local.py'
 
@@ -61,14 +62,18 @@ jobs:
             dockerfile: openmemory/ui/Dockerfile
             context: openmemory/ui
             image: openmemory-ui
-          - service: mem0
-            dockerfile: server/Dockerfile
-            context: server
-            image: openmemory-mem0
-          - service: storage
-            dockerfile: pgvector/Dockerfile
-            context: pgvector
-            image: mem0-storage
+          - service: keycloak
+            dockerfile: openmemory/keycloak/Dockerfile
+            context: openmemory/keycloak
+            image: openmemory-keycloak
+          # - service: mem0
+          #   dockerfile: server/Dockerfile
+          #   context: server
+          #   image: openmemory-mem0
+          # - service: storage
+          #   dockerfile: pgvector/Dockerfile
+          #   context: pgvector
+          #   image: mem0-storage
 
     steps:
       - name: Checkout repository

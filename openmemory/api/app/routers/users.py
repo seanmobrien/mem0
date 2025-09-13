@@ -7,6 +7,7 @@ from sqlalchemy import String, Uuid, func, desc, sql
 
 from app.database import get_db
 from app.models import User, App, Memory, MemoryAccessLog, MemoryState
+from app.auth import get_current_user, get_user_id
 
 router = APIRouter(prefix="/api/v1/users", tags=["users"])
 

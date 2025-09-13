@@ -12,7 +12,12 @@ from app.config import USER_ID, DEFAULT_APP_ID
 
 publicUrl = os.getenv("NEXT_PUBLIC_URL") or "http://localhost:8000"
 
-app = FastAPI(title="OpenMemory API", servers=[{"url": publicUrl }], root_path_in_servers=False)
+app = FastAPI(
+    title="OpenMemory API", 
+    servers=[{"url": publicUrl}], 
+    root_path_in_servers=False,
+    description="OpenMemory API with Keycloak authentication"
+)
 
 app.add_middleware(
     CORSMiddleware,

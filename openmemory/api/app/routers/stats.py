@@ -10,6 +10,7 @@ from fastapi import Depends
 from mem0.utils.factory import VectorStoreFactory
 import mem0
 from datetime import datetime, timezone
+from app.auth import get_current_user, get_user_id, check_auth_service_health
 
 
 logger = logging.getLogger(__name__)
@@ -17,8 +18,8 @@ router = APIRouter(prefix="/api/v1/stats", tags=["stats"])
 
 @router.get("/")
 async def get_profile(
-    user_id: str,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_user_id)
 ):
     user = db.query(User).filter(User.user_id == user_id).first()
     if not user:
@@ -258,6 +259,9 @@ async def health_check(
                 }
             }
         )
+    # Check authentication service health
+    auth_health = check_auth_service_health()
+    
     # And send all this data back
     return {
         "status": "ok", 
@@ -273,6 +277,7 @@ async def health_check(
             "graph_enabled": graph_enabled,        
             "graph_store_available": graph_store_available,
             "history_store_available": history_store_available,
+            "auth_service": auth_health,
             "errors": errors
         }
     }

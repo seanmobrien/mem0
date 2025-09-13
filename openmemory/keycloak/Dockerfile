@@ -1,12 +1,12 @@
 # Keycloak OpenMemory Authentication Provider
-FROM quay.io/keycloak/keycloak:26.0.7
+FROM quay.io/keycloak/keycloak:26.3.4
 
 # Set environment variables with defaults for development
 ENV KC_DB=postgres
 ENV KC_DB_URL_HOST=postgres
 ENV KC_DB_URL_DATABASE=keycloak
-ENV KC_DB_USERNAME=keycloak
-ENV KC_DB_PASSWORD=keycloak
+#ENV KC_DB_USERNAME=keycloak
+#ENV KC_DB_PASSWORD=keycloak
 ENV KC_HOSTNAME=localhost
 ENV KC_HTTP_ENABLED=true
 ENV KC_HTTP_PORT=8080

@@ -3,7 +3,7 @@ ARG KC_DB_URL_DATABASE=keycloak
 # Keycloak OpenMemory Authentication Provider
 FROM quay.io/keycloak/keycloak:26.3.4
 
-#ARG KC_HOSTNAME
+ARG KC_DB_URL_DATABASE
 ARG KC_LOG_LEVEL
 # Set environment variables with defaults for development
 ENV KC_DB=postgres
@@ -15,8 +15,6 @@ ENV KC_HTTPS_PORT=8443
 ENV KC_HEALTH_ENABLED=true
 ENV KC_METRICS_ENABLED=true
 ENV KC_LOG_LEVEL=${KC_LOG_LEVEL}
-
-RUN apt-get update && apt-get install -y gawk grep && rm -rf /var/lib/apt/lists/*
 
 # Create a non-root user for security
 USER 1000:1000
@@ -30,7 +28,7 @@ RUN chmod +x /opt/keycloak/start.sh && \
     /opt/keycloak/bin/kc.sh show-config
 
 # Expose ports
-EXPOSE 8443
+EXPOSE 8080 8443
 
 # Start Keycloak with optimized configuration
 ENTRYPOINT ["/opt/keycloak/start.sh"]

@@ -6,12 +6,12 @@ on:
   push:
     branches: [implementation/school-law]
     paths:
-      - 'openmemory/**'
-      - 'server/**'
+      - "openmemory/**"
+      - "server/**"
       # - 'pgvector/**'
-      - 'mem0/**'
-      - 'pyproject.toml'
-      - 'build_local.py'
+      - "mem0/**"
+      - "pyproject.toml"
+      - "build_local.py"
   #pull_request:
   #  paths:
   #    - 'openmemory/**'
@@ -40,6 +40,7 @@ jobs:
           filters: |
             openmemory:
               - '{openmemory,server,mem0}/**'
+              - 'openmemory/keycloak/**'
               - 'pyproject.toml'
               - 'build_local.py'
 

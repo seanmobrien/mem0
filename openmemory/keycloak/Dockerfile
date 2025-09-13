@@ -22,7 +22,7 @@ ENV KC_LOG_LEVEL=${KC_LOG_LEVEL}
 USER 1000:1000
 
 COPY --chown=1000:1000 keycloak.conf /opt/keycloak/conf/keycloak.conf
-
+COPY --chown=1000:1000 start.sh /opt/keycloak/start.sh
 
 # Configure Keycloak for production-ready deployment
 RUN /opt/keycloak/bin/kc.sh build
@@ -35,5 +35,5 @@ EXPOSE 8443
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD curl -f https://localhost:8443/health/ready || exit 1
 # Start Keycloak with optimized configuration
-ENTRYPOINT ["/opt/keycloak/bin/kc.sh", "start --optimized"]
+ENTRYPOINT ["/opt/keycloak/start.sh"]
 #ENTRYPOINT ["/bin/bash"]

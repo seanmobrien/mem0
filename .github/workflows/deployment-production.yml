@@ -41,10 +41,17 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
+      - name: Compute image tag
+        id: vars
+        run: |
+          SANITIZED_REF="${GITHUB_REF_NAME//\//-}"
+          SHORT_SHA="${GITHUB_SHA::7}"
+          echo "tag=${SANITIZED_REF}-${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+
       - name: Deploy ${{ matrix.image}} to ${{ matrix.containerAppName }}
         uses: azure/container-apps-deploy-action@v1
         with:
-          imageToDeploy: ${{ github.ref_name }}-${{ substring(github.sha, 0, 7) }}
+          imageToDeploy: schoollawregistry.azurecr.io/${{ matrix.image }}:${{ steps.vars.outputs.tag }}
           acrName: schoollawregistry
           containerAppName: ${{ matrix.containerAppName }}
           resourceGroup: SchoolLawyer

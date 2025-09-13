@@ -20,6 +20,7 @@ from app.models import (
 )
 from app.schemas import MemoryResponse, PaginatedMemoryResponse
 from app.utils.permissions import check_memory_access_permissions
+from app.auth import get_current_user, get_user_id
 
 router = APIRouter(prefix="/api/v1/memories", tags=["memories"])
 
@@ -97,7 +98,6 @@ def get_accessible_memory_ids(db: Session, app_id: UUID) -> Set[UUID]:
 # List all memories with filtering
 @router.get("/", response_model=Page[MemoryResponse])
 async def list_memories(
-    user_id: str,
     app_id: Optional[UUID] = None,
     from_date: Optional[int] = Query(
         None,
@@ -114,8 +114,13 @@ async def list_memories(
     search_query: Optional[str] = None,
     sort_column: Optional[str] = Query(None, description="Column to sort by (memory, categories, app_name, created_at)"),
     sort_direction: Optional[str] = Query(None, description="Sort direction (asc or desc)"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
+    # Extract user_id from authenticated user
+    user_id = current_user.get("sub") or current_user.get("preferred_username")
+    if not user_id:
+        raise HTTPException(status_code=400, detail="User ID not found in token")
     user = db.query(User).filter(User.user_id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")

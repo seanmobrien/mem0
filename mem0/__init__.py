@@ -66,9 +66,10 @@ def get_build_info():
             "version": __version__
         }
     except Exception as e:
+        # Don't leak internal exception details to external callers
         return {
             "type": "unknown",
-            "info": f"detection failed: {e}",
+            "info": "Build metadata detection failed",
             "version": __version__
         }
 

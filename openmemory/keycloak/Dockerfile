@@ -28,7 +28,7 @@ RUN chmod +x /opt/keycloak/start.sh && \
     /opt/keycloak/bin/kc.sh show-config
 
 # Expose ports
-EXPOSE 8080 8443
+EXPOSE 8080 8443 9000
 
 # Start Keycloak with optimized configuration
 ENTRYPOINT ["/opt/keycloak/start.sh"]

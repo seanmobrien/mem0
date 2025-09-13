@@ -6,15 +6,11 @@ on:
   push:
     branches: [implementation/school-law]
     paths:
-      - 'openmemory/**'
-      - 'server/**'
-      # - 'pgvector/**'
-      - 'mem0/**'
-      - 'pyproject.toml'
-      - 'build_local.py'
-  #pull_request:
-  #  paths:
-  #    - 'openmemory/**'
+      - "openmemory/**"
+      - "server/**"
+      - "mem0/**"
+      - "pyproject.toml"
+      - "build_local.py"
   workflow_dispatch:
 
 env:
@@ -40,6 +36,7 @@ jobs:
           filters: |
             openmemory:
               - '{openmemory,server,mem0}/**'
+              - 'openmemory/keycloak/**'
               - 'pyproject.toml'
               - 'build_local.py'
 
@@ -66,14 +63,6 @@ jobs:
             dockerfile: openmemory/keycloak/Dockerfile
             context: openmemory/keycloak
             image: openmemory-keycloak
-          # - service: mem0
-          #   dockerfile: server/Dockerfile
-          #   context: server
-          #   image: openmemory-mem0
-          # - service: storage
-          #   dockerfile: pgvector/Dockerfile
-          #   context: pgvector
-          #   image: mem0-storage
 
     steps:
       - name: Checkout repository

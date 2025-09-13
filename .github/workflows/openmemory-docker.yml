@@ -112,6 +112,7 @@ jobs:
             GITHUB_SHA=${{ github.sha }}
             GITHUB_ACTOR=${{ github.actor }}
             GITHUB_WORKFLOW=${{ github.workflow }}
+            KC_DB_URL_DATABASE=${{ vars.KC_DB_URL_DATABASE }}
 
       - name: Output image digest
         run: echo "Image digest for ${{ matrix.service }} built successfully"

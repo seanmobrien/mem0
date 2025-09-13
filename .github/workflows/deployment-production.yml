@@ -1,0 +1,50 @@
+# @format: yaml
+
+name: Deploy to Production
+
+permissions:
+  contents: read
+  id-token: write
+
+on:
+  workflow_run:
+    workflows: ["OpenMemory Docker Build and Deploy"]
+    types:
+      - completed
+    branches:
+      - implementation/school-law
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    if: (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    environment: Production
+    permissions:
+      contents: read
+      id-token: write
+    strategy:
+      matrix:
+        include:
+          - containerAppName: mem0-api
+            context: .
+            image: openmemory-api
+          - containerAppName: mem0-ui
+            image: openmemory-ui
+          - containerAppName: login
+            image: openmemory-keycloak
+    steps:
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy ${{ matrix.image}} to ${{ matrix.containerAppName }}
+        uses: azure/container-apps-deploy-action@v1
+        with:
+          imageToDeploy: ${GITHUB_REF_NAME}-${GITHUB_SHA::7}
+          acrName: schoollawregistry
+          containerAppName: ${{ matrix.containerAppName }}
+          resourceGroup: SchoolLawyer

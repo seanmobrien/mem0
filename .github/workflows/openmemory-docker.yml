@@ -8,13 +8,9 @@ on:
     paths:
       - "openmemory/**"
       - "server/**"
-      # - 'pgvector/**'
       - "mem0/**"
       - "pyproject.toml"
       - "build_local.py"
-  #pull_request:
-  #  paths:
-  #    - 'openmemory/**'
   workflow_dispatch:
 
 env:
@@ -67,14 +63,6 @@ jobs:
             dockerfile: openmemory/keycloak/Dockerfile
             context: openmemory/keycloak
             image: openmemory-keycloak
-          # - service: mem0
-          #   dockerfile: server/Dockerfile
-          #   context: server
-          #   image: openmemory-mem0
-          # - service: storage
-          #   dockerfile: pgvector/Dockerfile
-          #   context: pgvector
-          #   image: mem0-storage
 
     steps:
       - name: Checkout repository

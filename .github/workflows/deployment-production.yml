@@ -44,7 +44,7 @@ jobs:
       - name: Deploy ${{ matrix.image}} to ${{ matrix.containerAppName }}
         uses: azure/container-apps-deploy-action@v1
         with:
-          imageToDeploy: ${GITHUB_REF_NAME}-${GITHUB_SHA::7}
+          imageToDeploy: ${{ github.ref_name }}-${{ substring(github.sha, 0, 7) }}
           acrName: schoollawregistry
           containerAppName: ${{ matrix.containerAppName }}
           resourceGroup: SchoolLawyer

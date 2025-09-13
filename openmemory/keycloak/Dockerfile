@@ -19,6 +19,8 @@ ENV KC_HEALTH_ENABLED=true
 ENV KC_METRICS_ENABLED=true
 ENV KC_LOG_LEVEL=${KC_LOG_LEVEL}
 
+RUN apt-get update && apt-get install -y gawk grep && rm -rf /var/lib/apt/lists/*
+
 # Create a non-root user for security
 USER 1000:1000
 

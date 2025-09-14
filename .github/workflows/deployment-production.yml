@@ -11,8 +11,6 @@ on:
     workflows: ["OpenMemory Docker Build and Deploy"]
     types:
       - completed
-    branches:
-      - implementation/school-law
   workflow_dispatch:
 
 jobs:
@@ -33,6 +31,7 @@ jobs:
             image: openmemory-ui
           - containerAppName: login
             image: openmemory-keycloak
+            envVars: KC_HOSTNAME=${{ vars.KC_HOSTNAME }},KC_LOG_LEVEL=INFO,KC_DB_URL_DATABASE=${{ vars.KC_DB_URL_DATABASE }},KC_DB_USERNAME=keycloak_user,KC_DB_URL_HOST=${{ vars.KC_DB_URL_HOST }},KC_DB_PASSWORD=secretRef:db-login-password,KC_HTTP_ENABLED=true,KC_HTTPS_PORT=8443,KEYCLOAK_ADMIN=dog,KEYCLOAK_ADMIN_PASSWORD=secretRef:kc-admin-password,KC_HTTP_PORT=8080
     steps:
       - name: Azure Login
         uses: azure/login@v1
@@ -48,10 +47,23 @@ jobs:
           SHORT_SHA="${GITHUB_SHA::7}"
           echo "tag=${SANITIZED_REF}-${SHORT_SHA}" >> "$GITHUB_OUTPUT"
 
-      - name: Deploy ${{ matrix.image}} to ${{ matrix.containerAppName }}
-        uses: azure/container-apps-deploy-action@v1
+      - name: Deploy ${{ matrix.image}} to ${{ matrix.containerAppName }} (with env vars)
+        if: matrix.envVars != '' && matrix.envVars != null
+        uses: azure/container-apps-deploy-action@v2
         with:
           imageToDeploy: schoollawregistry.azurecr.io/${{ matrix.image }}:${{ steps.vars.outputs.tag }}
           acrName: schoollawregistry
           containerAppName: ${{ matrix.containerAppName }}
+          containerAppEnvironment: ComplianceTheatre2000
+          resourceGroup: SchoolLawyer
+          environmentVariables: ${{ matrix.envVars }}
+
+      - name: Deploy ${{ matrix.image}} to ${{ matrix.containerAppName }} (no env var changes)
+        if: matrix.envVars == '' || matrix.envVars == null
+        uses: azure/container-apps-deploy-action@v2
+        with:
+          imageToDeploy: schoollawregistry.azurecr.io/${{ matrix.image }}:${{ steps.vars.outputs.tag }}
+          acrName: schoollawregistry
+          containerAppName: ${{ matrix.containerAppName }}
+          containerAppEnvironment: ComplianceTheatre2000
           resourceGroup: SchoolLawyer

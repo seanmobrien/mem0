@@ -1,15 +1,16 @@
 #!/bin/sh
 
 if [ "$1" = "debug" ]; then
+    KEEPALIVE_INTERVAL=10
     echo "Debug keep-alive mode. Press any key (or Ctrl+C) to exit."
     while :; do
         echo keep-alive        
-        # Wait up to 10s for a single keypress; if received, exit loop
-        if ( read -r -t 10 _key ) 2>/dev/null; then
+        # Wait up to ${KEEPALIVE_INTERVAL}s for a single keypress; if received, exit loop
+        if ( read -r -t "$KEEPALIVE_INTERVAL" _key ) 2>/dev/null; then
             echo "Key pressed, exiting debug mode."
             break
         fi
-        sleep 10
+        sleep "$KEEPALIVE_INTERVAL"
     done
 fi
 

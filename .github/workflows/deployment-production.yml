@@ -34,11 +34,13 @@ jobs:
             envVars: KC_HOSTNAME=${{ vars.KC_HOSTNAME }},KC_LOG_LEVEL=INFO,KC_DB_URL_DATABASE=${{ vars.KC_DB_URL_DATABASE }},KC_DB_USERNAME=keycloak_user,KC_DB_URL_HOST=${{ vars.KC_DB_URL_HOST }},KC_DB_PASSWORD=secretRef:db-login-password,KC_HTTP_ENABLED=true,KC_HTTPS_PORT=8443,KEYCLOAK_ADMIN=dog,KEYCLOAK_ADMIN_PASSWORD=secretRef:kc-admin-password,KC_HTTP_PORT=8080
     steps:
       - name: Azure Login
-        uses: azure/login@v1
+        uses: azure/login@v2.3.0
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          enable-AzPSSession: true
+          auth-type: IDENTITY
 
       - name: Compute image tag
         id: vars

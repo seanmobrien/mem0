@@ -52,4 +52,4 @@ echo "------- Current configuration -------"
 cd /opt/keycloak
 ./bin/kc.sh show-config
 echo "------- Starting Keycloak -------"
-exec /opt/keycloak/bin/kc.sh start "--optimized"
+exec /opt/keycloak/bin/kc.sh start --optimized

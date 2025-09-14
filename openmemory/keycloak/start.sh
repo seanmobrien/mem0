@@ -1,5 +1,20 @@
 #!/bin/sh
 
+if [ "$1" = "debug" ]; then
+    KEEPALIVE_INTERVAL=10
+    echo "Debug keep-alive mode. Press any key (or Ctrl+C) to exit."
+    while :; do
+        echo keep-alive
+        # Wait up to ${KEEPALIVE_INTERVAL}s for a single keypress; if received, exit loop
+        if ( read -r -t "$KEEPALIVE_INTERVAL" _key ) 2>/dev/null; then
+            echo "Key pressed, exiting debug mode."
+            break
+        fi
+        sleep "$KEEPALIVE_INTERVAL"
+    done
+fi
+
+
 # Extract private/public key pair from combined PEM at /mnt/secrets/cert-https
 PEM_SRC="/mnt/secrets/cert-https"
 OUT_DIR="/opt/keycloak/conf"
@@ -12,10 +27,13 @@ if [ ! -s "$PEM_SRC" ]; then
 fi
 
 # Extract private key (supports RSA, EC, PKCS8)
-awk 'BEGIN{p=0} /BEGIN .*PRIVATE KEY/{p=1} {if(p)print} /END .*PRIVATE KEY/{p=0}' "$PEM_SRC" > "$PRIV_OUT" || exit 1
+sed -n '/BEGIN .*PRIVATE KEY/,/END .*PRIVATE KEY/p' "$PEM_SRC" > "$PRIV_OUT" || exit 1
 
 # Extract first certificate (public key)
-awk 'BEGIN{c=0} /BEGIN CERTIFICATE/{c=1} {if(c)print} /END CERTIFICATE/{if(c){exit}}' "$PEM_SRC" > "$CERT_OUT" || exit 1
+sed -n '/BEGIN CERTIFICATE/,/END CERTIFICATE/{
+    p
+    /END CERTIFICATE/q
+}' "$PEM_SRC" > "$CERT_OUT" || exit 1
 
 # Validate extraction
 if ! grep -q "BEGIN CERTIFICATE" "$CERT_OUT"; then
@@ -34,4 +52,4 @@ echo "------- Current configuration -------"
 cd /opt/keycloak
 ./bin/kc.sh show-config
 echo "------- Starting Keycloak -------"
-./bin/kc.sh start --optimized
+exec /opt/keycloak/bin/kc.sh start --optimized

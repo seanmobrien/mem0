@@ -1,16 +1,13 @@
-ARG KC_HOSTNAME
 ARG KC_LOG_LEVEL=INFO
-ARG KC_DB_URL_DATABASE
+ARG KC_DB_URL_DATABASE=keycloak
 # Keycloak OpenMemory Authentication Provider
 FROM quay.io/keycloak/keycloak:26.3.4
 
-ARG KC_HOSTNAME
+ARG KC_DB_URL_DATABASE
 ARG KC_LOG_LEVEL
 # Set environment variables with defaults for development
 ENV KC_DB=postgres
-ENV KC_DB_URL_HOST=postgres
 ENV KC_DB_URL_DATABASE=${KC_DB_URL_DATABASE}
-ENV KC_HOSTNAME=${KC_HOSTNAME}
 ENV KC_HTTP_ENABLED=true
 ENV KC_HTTPS_ENABLED=true
 ENV KC_HTTP_PORT=8080
@@ -31,7 +28,7 @@ RUN chmod +x /opt/keycloak/start.sh && \
     /opt/keycloak/bin/kc.sh show-config
 
 # Expose ports
-EXPOSE 8443
+EXPOSE 8080 8443 9000
 
 # Start Keycloak with optimized configuration
 ENTRYPOINT ["/opt/keycloak/start.sh"]

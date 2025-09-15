@@ -233,11 +233,10 @@ def get_user_record(current_user: Dict[str, Any] = Depends(get_current_user), db
             User record from database
     """
     current_user_id = get_user_id(current_user)
-    user = db.query(User).filter(User.user_id == current_user_id).first()
     if not user:
         new_user = User(
-            name=user.get("firstName", "") + " " + user.get("lastName", ""),
-            email=user.get("email", None),
+            name=current_user.get("firstName", "") + " " + usercurrent_userget("lastName", ""),
+            email=current_user.get("email", None),
             user_id=current_user_id,
             metadata_= {},
             created_at=datetime.datetime.now(datetime.UTC),

@@ -442,7 +442,6 @@ class Memory(MemoryBase):
             logging.error(f"Error iterating new_memories_with_actions: {e}")
             raise MemoryError(f"Error processing LLM response: {e}")
 
-
         keys, encoded_ids = process_telemetry_filters(filters)
         capture_event(
             "mem0.add",

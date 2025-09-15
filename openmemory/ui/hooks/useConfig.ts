@@ -1,22 +1,20 @@
 /** @format */
 
 import { useState } from 'react';
-import axios from 'axios';
-import { useDispatch, useSelector } from 'react-redux';
-import { AppDispatch, RootState } from '@/store/store';
+import { useDispatch } from 'react-redux';
+import { AppDispatch } from '@/store/store';
 import {
   setConfigLoading,
   setConfigSuccess,
   setConfigError,
   updateLLM,
   updateEmbedder,
-  updateMem0Config,
-  updateOpenMemory,
   LLMProvider,
   EmbedderProvider,
   Mem0Config,
   OpenMemoryConfig,
 } from '@/store/configSlice';
+import apiClient from '@/lib/api-client';
 
 interface UseConfigApiReturn {
   fetchConfig: () => Promise<void>;
@@ -42,7 +40,7 @@ export const useConfig = (): UseConfigApiReturn => {
     dispatch(setConfigLoading());
 
     try {
-      const response = await axios.get(`${URL}/api/v1/config/`);
+      const response = await apiClient.get(`${URL}/api/v1/config/`);
       dispatch(setConfigSuccess(response.data));
       setIsLoading(false);
     } catch (err: any) {
@@ -65,7 +63,7 @@ export const useConfig = (): UseConfigApiReturn => {
     setError(null);
 
     try {
-      const response = await axios.put(`${URL}/api/v1/config`, config);
+      const response = await apiClient.put(`${URL}/api/v1/config`, config);
       dispatch(setConfigSuccess(response.data));
       setIsLoading(false);
       return response.data;
@@ -86,7 +84,7 @@ export const useConfig = (): UseConfigApiReturn => {
     setError(null);
 
     try {
-      const response = await axios.post(`${URL}/api/v1/config/reset`);
+      const response = await apiClient.post(`${URL}/api/v1/config/reset`);
       dispatch(setConfigSuccess(response.data));
       setIsLoading(false);
       return response.data;
@@ -107,7 +105,7 @@ export const useConfig = (): UseConfigApiReturn => {
     setError(null);
 
     try {
-      const response = await axios.put(
+      const response = await apiClient.put(
         `${URL}/api/v1/config/mem0/llm`,
         llmConfig
       );
@@ -130,7 +128,7 @@ export const useConfig = (): UseConfigApiReturn => {
     setError(null);
 
     try {
-      const response = await axios.put(
+      const response = await apiClient.put(
         `${URL}/api/v1/config/mem0/embedder`,
         embedderConfig
       );

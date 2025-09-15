@@ -1,7 +1,6 @@
 /** @format */
 
 import { useState, useCallback } from 'react';
-import axios from 'axios';
 import { useDispatch, useSelector } from 'react-redux';
 import { AppDispatch, RootState } from '@/store/store';
 import {
@@ -13,6 +12,7 @@ import {
   setSelectedApps,
   setSelectedCategories,
 } from '@/store/filtersSlice';
+import apiClient from '@/lib/api-client';
 
 interface CategoriesResponse {
   categories: Category[];
@@ -40,7 +40,7 @@ export const useFiltersApi = (): UseFiltersApiReturn => {
     setIsLoading(true);
     dispatch(setCategoriesLoading());
     try {
-      const response = await axios.get<CategoriesResponse>(
+      const response = await apiClient.get<CategoriesResponse>(
         `${URL}/api/v1/memories/categories/?user_id=${user_id}`
       );
 

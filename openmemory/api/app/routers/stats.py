@@ -10,7 +10,7 @@ from fastapi import Depends
 from mem0.utils.factory import VectorStoreFactory
 import mem0
 from datetime import datetime, timezone
-from app.auth import get_current_user, get_user_id, check_auth_service_health
+from app.auth import get_current_user, get_user_record, check_auth_service_health
 
 
 logger = logging.getLogger(__name__)
@@ -19,11 +19,8 @@ router = APIRouter(prefix="/api/v1/stats", tags=["stats"])
 @router.get("/")
 async def get_profile(
     db: Session = Depends(get_db),
-    user_id: str = Depends(get_user_id)
+    user: User = Depends(get_user_record)
 ):
-    user = db.query(User).filter(User.user_id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
     
     # Get total number of memories
     total_memories = db.query(Memory).filter(Memory.user_id == user.id, Memory.state != MemoryState.deleted).count()

@@ -5,9 +5,12 @@ This module provides JWT token validation and user authentication
 using Keycloak as the identity provider.
 """
 
+import datetime
 import os
 import logging
 from typing import Optional, Dict, Any
+from app.database import get_db
+from app.models import User
 from fastapi import HTTPException, Depends, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import JWTError, jwt
@@ -25,6 +28,7 @@ KEYCLOAK_SERVER_URL = os.getenv("KEYCLOAK_SERVER_URL", "http://localhost:8080")
 KEYCLOAK_REALM = os.getenv("KEYCLOAK_REALM", "openmemory")
 KEYCLOAK_CLIENT_ID = os.getenv("KEYCLOAK_CLIENT_ID", "openmemory-api")
 KEYCLOAK_CLIENT_SECRET = os.getenv("KEYCLOAK_CLIENT_SECRET", "")
+ADMIN_ROLE = "memory_admin"
 
 # Feature flag for authentication (can be disabled for development)
 AUTH_ENABLED = os.getenv("AUTH_ENABLED", "true").lower() in ("true", "1", "yes", "on")
@@ -92,8 +96,12 @@ def verify_token(token: str) -> Dict[str, Any]:
                 detail="Token is not active",
                 headers={"WWW-Authenticate": "Bearer"},
             )
+        if (not has_role(token_info, "memory_user")):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Insufficient permissions",
+            )
         
-        # Additional validation can be added here
         return token_info
         
     except HTTPException:
@@ -190,6 +198,8 @@ def require_role(required_role: str):
     
     return role_checker
 
+def require_admin():
+    return require_role(ADMIN_ROLE)
 
 def get_user_id(current_user: Dict[str, Any] = Depends(get_current_user)) -> str:
     """
@@ -212,6 +222,31 @@ def get_user_id(current_user: Dict[str, Any] = Depends(get_current_user)) -> str
         )
     return user_id
 
+def get_user_record(current_user: Dict[str, Any] = Depends(get_current_user), db = Depends(get_db)) -> User: # type: ignore
+    """
+    Retrieve user record from database based on authenticated user ID
+    
+    Args:
+        current_user: Authenticated user information
+        db: Database session
+        Returns:
+            User record from database
+    """
+    current_user_id = get_user_id(current_user)
+    user = db.query(User).filter(User.user_id == current_user_id).first()
+    if not user:
+        new_user = User(
+            name=user.get("firstName", "") + " " + user.get("lastName", ""),
+            email=user.get("email", None),
+            user_id=user_id,
+            metadata_= {},
+            created_at=datetime.datetime.now(datetime.UTC),
+            updated_at=datetime.datetime.now(datetime.UTC),
+        )
+        db.add(new_user)
+        db.commit()
+        db.refresh(new_user)    
+    return user
 
 # Health check function for authentication service
 def check_auth_service_health() -> Dict[str, Any]:

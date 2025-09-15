@@ -21,14 +21,15 @@ from typing import Any, Dict, List, Mapping
 from mcp.server.fastmcp import FastMCP, Context
 from mcp.server.sse import SseServerTransport
 from app.utils.memory import get_memory_client
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, Depends
 from fastapi.routing import APIRouter
 import contextvars
 import os
 from dotenv import load_dotenv
 from app.database import SessionLocal
-from app.models import Memory, MemoryState, MemoryStatusHistory, MemoryAccessLog
+from app.models import Memory, MemoryState, MemoryStatusHistory, MemoryAccessLog, User
 from app.utils.db import get_user_and_app
+from app.auth import get_user_record
 import uuid
 import datetime
 from app.utils.permissions import check_memory_access_permissions
@@ -354,12 +355,16 @@ async def delete_all_memories() -> str:
 
 
 @mcp_router.get("/{client_name}/sse/{user_id}")
-async def handle_sse(request: Request):
-    """Handle SSE connections for a specific user and client"""
-    # Extract user_id and client_name from path parameters
-    uid = request.path_params.get("user_id")
+async def handle_sse(request: Request, client_name: str, user: User = Depends(get_user_record)):
+    """Handle SSE connections for a specific user and client.
+
+    The route keeps the `{user_id}` path parameter for backward compatibility,
+    but the authenticated user (via `get_user_record`) is used as the source
+    of truth. The path `user_id` is ignored.
+    """
+    # Use authenticated user's external id and provided client_name
+    uid = user.user_id
     user_token = user_id_var.set(uid or "")
-    client_name = request.path_params.get("client_name")
     client_token = client_name_var.set(client_name or "")
 
     try:
@@ -386,8 +391,20 @@ async def handle_get_message(request: Request):
 
 
 @mcp_router.post("/{client_name}/sse/{user_id}/messages/")
-async def handle_post_message_route(request: Request):
-    return await handle_post_message(request)
+async def handle_post_message_route(request: Request, client_name: str, user: User = Depends(get_user_record)):
+    """Handle POST messages for SSE while setting authenticated user context.
+
+    The `{user_id}` path parameter is accepted for compatibility but ignored in
+    favor of the authenticated user obtained via `get_user_record`.
+    """
+    uid = user.user_id
+    user_token = user_id_var.set(uid or "")
+    client_token = client_name_var.set(client_name or "")
+    try:
+        return await handle_post_message(request)
+    finally:
+        user_id_var.reset(user_token)
+        client_name_var.reset(client_token)
 
 async def handle_post_message(request: Request):
     """Handle POST messages for SSE"""

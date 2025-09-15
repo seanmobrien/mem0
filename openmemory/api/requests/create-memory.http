@@ -1,5 +1,6 @@
 POST http://localhost:8000/api/v1/memories/
 content-type: application/json
+Authorization: Bearer ${{TOKEN}}
 
 {
     "user_id": "test",
@@ -7,3 +8,10 @@ content-type: application/json
     "infer": false,
     "app": "openmemory"
 }
+
+###
+
+GET http://localhost:8000/api/v1/memories/
+content-type: application/json
+Authorization: Bearer ${{TOKEN}}
+

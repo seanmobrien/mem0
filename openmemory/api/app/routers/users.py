@@ -7,7 +7,7 @@ from sqlalchemy import String, Uuid, func, desc, sql
 
 from app.database import get_db
 from app.models import User, App, Memory, MemoryAccessLog, MemoryState
-from app.auth import get_current_user, get_user_id
+from app.auth import get_current_user, get_user_id, get_user_record, require_admin
 
 router = APIRouter(prefix="/api/v1/users", tags=["users"])
 
@@ -31,17 +31,22 @@ async def list_users(
     #sort_direction: str = 'asc',
     #page: int = Query(1, ge=1),
     #page_size: int = Query(10, ge=1, le=100),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    user: User = Depends(get_user_record)
 ):
-    raise HTTPException(status_code=501, detail="This endpoint is not implemented yet")
-    #return db.query(User).all()
+    require_admin()
+    #raise HTTPException(status_code=501, detail="This endpoint is not implemented yet")
+    return db.query(User).all()
 
 # Get app details
 @router.get("/{user_id}")
 async def get_user_details(
     user_id: str,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    user: User = Depends(get_user_record)
 ):
+    if not user_id == user.user_id:
+        require_admin()
     user = get_user_or_404(db, user_id)
 
     # Get memory access statistics
@@ -70,8 +75,10 @@ async def create_user(
     name: str = "",    
     email: Optional[str] = None,
     metadata: Optional[dict] = None,
-    db: Session = Depends(get_db)
-):
+    db: Session = Depends(get_db),
+    user: User = Depends(get_user_record)
+):    
+    require_admin()
     # Validate input
     if not user_id:
         raise HTTPException(status_code=400, detail="User ID cannot be empty")
@@ -103,9 +110,11 @@ async def edit_user(
     name: Optional[str] = None,    
     email: Optional[str] = None,
     metadata: Optional[dict] = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    user: User = Depends(get_user_record)
 ):
-    # Validate input
+    if not user_id == user.user_id:
+        require_admin()
     if not user_id:
         raise HTTPException(status_code=400, detail="User ID cannot be empty")
     # Check if user exists

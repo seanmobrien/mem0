@@ -1,0 +1,19 @@
+POST http://localhost:8000/api/v1/users/?user_id=0dc75921-3b78-4729-9bae-8fb5e9e01ce6&name=0dc75921-3b78-4729-9bae-8fb5e9e01ce6&email=0dc75921-3b78-4729-9bae-8fb5e9e01ce6%40test.com
+content-type: application/json
+
+{
+  "user_id": "0dc75921-3b78-4729-9bae-8fb5e9e01ce6",
+  "name": "0dc75921-3b78-4729-9bae-8fb5e9e01ce6",
+  "email": "0dc75921-3b78-4729-9bae-8fb5e9e01ce6@test.com"
+}
+
+###
+
+GET http://localhost:8000/api/v1/users/
+content-type: application/json
+
+{
+  "user_id": "service-account-5080f08a-b7cc-4230-a243-86e3c90d5633",
+  "name": "service-account-5080f08a-b7cc-4230-a243-86e3c90d5633",
+  "email": "service-account@test.com"
+}

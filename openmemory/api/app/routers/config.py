@@ -7,7 +7,7 @@ import logging
 from app.database import get_db
 from app.models import Config as ConfigModel
 from app.utils.memory import reset_memory_client
-from app.auth import get_current_user, get_user_id
+from app.auth import get_current_user, get_user_record
 
 logger = logging.getLogger(__name__)
 

@@ -8,7 +8,7 @@ from sqlalchemy import func, desc, sql
 
 from app.database import get_db
 from app.models import User, App, Memory, MemoryAccessLog, MemoryState
-from app.auth import get_current_user, get_user_id
+from app.auth import get_current_user, get_user_record
 
 router = APIRouter(prefix="/api/v1/apps", tags=["apps"])
 
@@ -238,23 +238,17 @@ async def update_app_details(
 @router.post("/")
 async def create_app(
     name: str,
-    owner: str,
     description: Optional[str] = None,
     is_active: bool = True,
     metadata: Optional[dict] = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    user: User = Depends(get_user_record)
 ):
     # Validate input
     if not name:
         raise HTTPException(status_code=400, detail="App name cannot be empty")
-    if not owner:
-        raise HTTPException(status_code=400, detail="Owner cannot be empty")
-    # Check if user exists and retrieve id
-    userId = db.execute(
-        sql.select(User.id).where(User.user_id == owner)
-    ).scalars().first()
-    if userId is None:
-        raise HTTPException(status_code=404, detail="Owner not found")
+    # Use the authenticated user as the owner
+    userId = user.id
     # Make sure we don't already have an app with this name
     existing_app = db.execute(
         sql.select(App.id).where(App.name == name, App.owner_id == userId)

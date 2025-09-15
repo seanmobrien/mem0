@@ -233,6 +233,7 @@ def get_user_record(current_user: Dict[str, Any] = Depends(get_current_user), db
             User record from database
     """
     current_user_id = get_user_id(current_user)
+    user = db.query(User).filter(User.user_id == current_user_id).first()
     if not user:
         new_user = User(
             name=current_user.get("firstName", "") + " " + current_user.get("lastName", ""),
@@ -244,7 +245,8 @@ def get_user_record(current_user: Dict[str, Any] = Depends(get_current_user), db
         )
         db.add(new_user)
         db.commit()
-        db.refresh(new_user)    
+        db.refresh(new_user)   
+        user = new_user 
     return user
 
 # Health check function for authentication service

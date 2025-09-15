@@ -620,7 +620,6 @@ async def search_memories_endpoint(
 @router.get("/{memory_id}/related", response_model=Page[MemoryResponse])
 async def get_related_memories(
     memory_id: UUID,
-    user_id: str,
     params: Params = Depends(),
     db: Session = Depends(get_db),
     user: User = Depends(get_user_record)

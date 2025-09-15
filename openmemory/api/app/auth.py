@@ -222,7 +222,7 @@ def get_user_id(current_user: Dict[str, Any] = Depends(get_current_user)) -> str
         )
     return user_id
 
-def get_user_record(current_user: Dict[str, Any] = Depends(get_current_user), db = Depends(get_db)) -> User: # type: ignore
+def get_user_record(current_user: Dict[str, Any] = Depends(get_current_user), db = Depends(get_db)) -> User: # type: ignore  # FastAPI dependency injection confuses type checker
     """
     Retrieve user record from database based on authenticated user ID
     

@@ -1,7 +1,6 @@
 /** @format */
 
 import { useState, useCallback } from 'react';
-import axios from 'axios';
 import { useDispatch, useSelector } from 'react-redux';
 import { AppDispatch, RootState } from '@/store/store';
 import {
@@ -22,6 +21,7 @@ import {
   setAccessedMemoriesError,
   setSelectedAppError,
 } from '@/store/appsSlice';
+import apiClient from '@/lib/api-client';
 
 interface ApiResponse {
   total: number;
@@ -112,7 +112,7 @@ export const useAppsApi = (): UseAppsApiReturn => {
         if (sort_direction)
           queryParams.append('sort_direction', sort_direction);
 
-        const response = await axios.get<ApiResponse>(
+        const response = await apiClient.get<ApiResponse>(
           `${URL}/api/v1/apps/?${queryParams.toString()}`
         );
 
@@ -138,7 +138,7 @@ export const useAppsApi = (): UseAppsApiReturn => {
       setIsLoading(true);
       dispatch(setSelectedAppLoading());
       try {
-        const response = await axios.get<AppDetails>(
+        const response = await apiClient.get<AppDetails>(
           `${URL}/api/v1/apps/${appId}/`
         );
         dispatch(setSelectedAppDetails(response.data));
@@ -163,7 +163,7 @@ export const useAppsApi = (): UseAppsApiReturn => {
       setIsLoading(true);
       dispatch(setCreatedMemoriesLoading());
       try {
-        const response = await axios.get<MemoriesResponse>(
+        const response = await apiClient.get<MemoriesResponse>(
           `${URL}/api/v1/apps/${appId}/memories/?page=${page}&page_size=${pageSize}`
         );
         dispatch(
@@ -193,7 +193,7 @@ export const useAppsApi = (): UseAppsApiReturn => {
       setIsLoading(true);
       dispatch(setAccessedMemoriesLoading());
       try {
-        const response = await axios.get<AccessedMemoriesResponse>(
+        const response = await apiClient.get<AccessedMemoriesResponse>(
           `${URL}/api/v1/apps/${appId}/accessed/?page=${page}&page_size=${pageSize}`
         );
         dispatch(
@@ -220,7 +220,7 @@ export const useAppsApi = (): UseAppsApiReturn => {
   ) => {
     setIsLoading(true);
     try {
-      const response = await axios.put(
+      const response = await apiClient.put(
         `${URL}/api/v1/apps/${appId}?is_active=${details.is_active}`
       );
       setIsLoading(false);

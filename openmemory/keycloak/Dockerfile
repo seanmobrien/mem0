@@ -21,10 +21,11 @@ USER 1000:1000
 
 COPY --chown=1000:1000 keycloak.conf /opt/keycloak/conf/keycloak.conf
 COPY --chown=1000:1000 start.sh /opt/keycloak/start.sh
+COPY --chown=1000:1000 providers /opt/keycloak/providers
 
 # Configure Keycloak for production-ready deployment
 RUN chmod +x /opt/keycloak/start.sh && \
-    /opt/keycloak/bin/kc.sh build && \
+    /opt/keycloak/bin/kc.sh build --features="declarative-ui" && \
     /opt/keycloak/bin/kc.sh show-config
 
 # Expose ports

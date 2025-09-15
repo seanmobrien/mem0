@@ -40,7 +40,7 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           enable-AzPSSession: true
-          auth-type: IDENTITY
+          #auth-type: IDENTITY
 
       - name: Compute image tag
         id: vars

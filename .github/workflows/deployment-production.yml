@@ -113,6 +113,7 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           enable-AzPSSession: true
+          # Switched from service principal authentication to managed identity for improved security and alignment with Azure best practices.
           auth-type: IDENTITY
 
       # Tag is provided by build metadata via the dynamic matrix (matrix.tag)

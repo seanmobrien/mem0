@@ -6,6 +6,10 @@ permissions:
   contents: read
   id-token: write
 
+concurrency:
+  group: deploy-production
+  cancel-in-progress: true
+
 on:
   workflow_run:
     workflows: ["OpenMemory Docker Build and Deploy"]
@@ -14,8 +18,87 @@ on:
   workflow_dispatch:
 
 jobs:
+  prepare_deploy:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.build.outputs.matrix }}
+      should_deploy: ${{ steps.build.outputs.should_deploy }}
+    steps:
+      - name: Download build metadata artifacts from triggering run
+        uses: actions/download-artifact@v4
+        with:
+          repository: ${{ github.repository }}
+          run-id: ${{ github.event.workflow_run.id }}
+          path: artifacts
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build dynamic deploy matrix and gating
+        id: build
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          # Collect metadata files (each artifact likely stored under its own dir)
+          mapfile -t files < <(find artifacts -type f -name 'metadata.json' | sort)
+          if (( ${#files[@]} == 0 )); then
+            echo "matrix=[]" >> "$GITHUB_OUTPUT"
+            echo "should_deploy=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Helper: map service -> containerAppName and envVars
+          map_service() {
+            local svc="$1"
+            case "$svc" in
+              api) echo "mem0-api" ;;
+              ui) echo "mem0-ui" ;;
+              keycloak) echo "login" ;;
+              *) echo "$svc" ;;
+            esac
+          }
+
+          map_envvars() {
+            local svc="$1"
+            if [[ "$svc" == "keycloak" ]]; then
+              echo "KC_HOSTNAME=${{ vars.KC_HOSTNAME }},KC_LOG_LEVEL=INFO,KC_DB_URL_DATABASE=${{ vars.KC_DB_URL_DATABASE }},KC_DB_USERNAME=keycloak_user,KC_DB_URL_HOST=${{ vars.KC_DB_URL_HOST }},KC_DB_PASSWORD=secretRef:db-login-password,KC_HTTP_ENABLED=true,KC_HTTPS_PORT=8443,KEYCLOAK_ADMIN=dog,KEYCLOAK_ADMIN_PASSWORD=secretRef:kc-admin-password,KC_HTTP_PORT=8080,KC_PII_ENCKEY=secretRef:kc-pii-enckey"
+            else
+              echo ""
+            fi
+          }
+
+          # Build matrix JSON
+          matrix='['
+          branch_ref=""
+          for f in "${files[@]}"; do
+            svc=$(jq -r .service "$f")
+            img=$(jq -r .image "$f")
+            # tags field may contain multiple lines.
+            # Expected tag format: <branch-or-name>-<sha>, e.g., feature-abc1234 or release-1.2.3-abcdef1
+            # This regex matches tags ending with a dash and a 7 or 8 character hex SHA.
+            tag=$(jq -r .tag "$f" | tr '\r' '\n' | grep -E '[-_A-Za-z0-9.]+-[0-9a-f]{7,8}$' | head -n1 || true)
+            if [[ -z "$tag" || "$tag" == "null" ]]; then
+              # fallback to first non-empty line
+              tag=$(jq -r .tag "$f" | tr '\r' '\n' | grep -E '\S' | head -n1 || true)
+            fi
+            branch=$(jq -r .branch "$f")
+            [[ -z "$branch_ref" ]] && branch_ref="$branch"
+            appName=$(map_service "$svc")
+            envVars=$(map_envvars "$svc")
+            matrix+="{\"containerAppName\":\"$appName\",\"image\":\"$img\",\"tag\":\"$tag\",\"envVars\":\"$envVars\"},"
+          done
+          matrix="${matrix%,}]"
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+
+          # Gate by branch/tag: allow 'implementation/school-law' branch or any 'release/*' tag
+          should=false
+          if [[ "$branch_ref" == "implementation/school-law" || "$branch_ref" == release/* ]]; then
+            should=true
+          fi
+          echo "should_deploy=$should" >> "$GITHUB_OUTPUT"
+
   deploy:
-    if: (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && startsWith(github.event.workflow_run.head_branch, 'implementation/')) || github.event_name == 'workflow_dispatch'
+    needs: prepare_deploy
+    if: (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && needs.prepare_deploy.outputs.should_deploy == 'true') || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     environment: Production
     permissions:
@@ -23,15 +106,7 @@ jobs:
       id-token: write
     strategy:
       matrix:
-        include:
-          - containerAppName: mem0-api
-            context: .
-            image: openmemory-api
-          - containerAppName: mem0-ui
-            image: openmemory-ui
-          - containerAppName: login
-            image: openmemory-keycloak
-            envVars: KC_HOSTNAME=${{ vars.KC_HOSTNAME }},KC_LOG_LEVEL=INFO,KC_DB_URL_DATABASE=${{ vars.KC_DB_URL_DATABASE }},KC_DB_USERNAME=keycloak_user,KC_DB_URL_HOST=${{ vars.KC_DB_URL_HOST }},KC_DB_PASSWORD=secretRef:db-login-password,KC_HTTP_ENABLED=true,KC_HTTPS_PORT=8443,KEYCLOAK_ADMIN=dog,KEYCLOAK_ADMIN_PASSWORD=secretRef:kc-admin-password,KC_HTTP_PORT=8080,KC_PII_ENCKEY=secretRef:kc-pii-enckey
+        include: ${{ fromJson(needs.prepare_deploy.outputs.matrix) }}
     steps:
       - name: Azure Login
         uses: azure/login@v2.3.0
@@ -40,20 +115,16 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           enable-AzPSSession: true
-          #auth-type: IDENTITY
+          # Switched from service principal authentication to managed identity for improved security and alignment with Azure best practices.
+          auth-type: IDENTITY
 
-      - name: Compute image tag
-        id: vars
-        run: |
-          SANITIZED_REF="${GITHUB_REF_NAME//\//-}"
-          SHORT_SHA="${GITHUB_SHA::7}"
-          echo "tag=${SANITIZED_REF}-${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+      # Tag is provided by build metadata via the dynamic matrix (matrix.tag)
 
       - name: Deploy ${{ matrix.image}} to ${{ matrix.containerAppName }} (with env vars)
         if: matrix.envVars != '' && matrix.envVars != null
         uses: azure/container-apps-deploy-action@v2
         with:
-          imageToDeploy: schoollawregistry.azurecr.io/${{ matrix.image }}:${{ steps.vars.outputs.tag }}
+          imageToDeploy: schoollawregistry.azurecr.io/${{ matrix.image }}:${{ matrix.tag }}
           acrName: schoollawregistry
           containerAppName: ${{ matrix.containerAppName }}
           containerAppEnvironment: ComplianceTheatre2000
@@ -64,7 +135,7 @@ jobs:
         if: matrix.envVars == '' || matrix.envVars == null
         uses: azure/container-apps-deploy-action@v2
         with:
-          imageToDeploy: schoollawregistry.azurecr.io/${{ matrix.image }}:${{ steps.vars.outputs.tag }}
+          imageToDeploy: schoollawregistry.azurecr.io/${{ matrix.image }}:${{ matrix.tag }}
           acrName: schoollawregistry
           containerAppName: ${{ matrix.containerAppName }}
           containerAppEnvironment: ComplianceTheatre2000

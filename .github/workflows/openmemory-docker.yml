@@ -145,10 +145,17 @@ jobs:
           RAW_BRANCH="${GITHUB_REF_NAME}"
           PREFIX=""
           if [[ -n "$RAW_BRANCH" ]]; then
-            # Sanitize: lowercase, replace invalid tag chars with '-', trim/collapse '-'
-            SAFE=$(echo "$RAW_BRANCH" \
-              | tr '[:upper:]' '[:lower:]' \
-              | sed -E 's/[^a-z0-9._-]+/-/g; s/^-+//; s/-+$//; s/-{2,}/-/g')
+            # Sanitize branch name for Docker tag:
+            # 1. Lowercase
+            SAFE=$(echo "$RAW_BRANCH" | tr '[:upper:]' '[:lower:]')
+            # 2. Replace invalid characters with '-'
+            SAFE=$(echo "$SAFE" | sed -E 's/[^a-z0-9._-]+/-/g')
+            # 3. Trim leading dashes
+            SAFE=$(echo "$SAFE" | sed -E 's/^-+//')
+            # 4. Trim trailing dashes
+            SAFE=$(echo "$SAFE" | sed -E 's/-+$//')
+            # 5. Collapse multiple dashes
+            SAFE=$(echo "$SAFE" | sed -E 's/-{2,}/-/g')
             if [[ -n "$SAFE" ]]; then
               PREFIX="${SAFE}-"
             fi

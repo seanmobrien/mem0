@@ -87,8 +87,8 @@ echo "Updating GitHub secrets ACR_USERNAME / ACR_PASSWORD for $REPO_OWNER/$REPO_
 # Requires gh auth with repo admin or repo scope
 GH_REPO="$REPO_OWNER/$REPO_NAME"
 
-echo -n "$username" | gh secret set ACR_USERNAME --repo "$GH_REPO" --body "$username"
+echo -n "$username" | gh secret set ACR_USERNAME --repo "$GH_REPO"
 # Mask the password via stdin
-echo -n "$password" | gh secret set ACR_PASSWORD --repo "$GH_REPO" --body "$password"
+echo -n "$password" | gh secret set ACR_PASSWORD --repo "$GH_REPO"
 
 echo "Done. Test login (optional): docker login $acr_login_server --username $username --password-stdin <<< '***'"

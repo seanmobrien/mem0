@@ -152,8 +152,8 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ matrix.image }}
           tags: |
             type=ref,event=branch
-            type=ref,event=pr
-            type=sha,format=short,prefix={{branch}}-
+            type=ref,event=pr            
+            type=sha,format=short,prefix={{ if ne .Branch "" }}{{ .Branch }}-{{ end }}
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/implementation/school-law' }}
 
       - name: Build and push Docker image

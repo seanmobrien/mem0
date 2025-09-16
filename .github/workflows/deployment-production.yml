@@ -72,8 +72,10 @@ jobs:
           for f in "${files[@]}"; do
             svc=$(jq -r .service "$f")
             img=$(jq -r .image "$f")
-            # tags field may contain multiple lines; pick a branch-prefixed sha tag (branch-<sha7>)
-            tag=$(jq -r .tag "$f" | tr '\r' '\n' | grep -E '[-_A-Za-z0-9.]+-[0-9a-f]{7}$' | head -n1 || true)
+            # tags field may contain multiple lines.
+            # Expected tag format: <branch-or-name>-<sha>, e.g., feature-abc1234 or release-1.2.3-abcdef1
+            # This regex matches tags ending with a dash and a 7 or 8 character hex SHA.
+            tag=$(jq -r .tag "$f" | tr '\r' '\n' | grep -E '[-_A-Za-z0-9.]+-[0-9a-f]{7,8}$' | head -n1 || true)
             if [[ -z "$tag" || "$tag" == "null" ]]; then
               # fallback to first non-empty line
               tag=$(jq -r .tag "$f" | tr '\r' '\n' | grep -E '\S' | head -n1 || true)

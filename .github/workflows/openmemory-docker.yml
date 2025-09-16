@@ -137,6 +137,24 @@ jobs:
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Compute branch prefix for SHA tag
+        id: compute_prefix
+        shell: bash
+        run: |
+          # Derive a safe Docker tag prefix from the branch name, if present
+          RAW_BRANCH="${GITHUB_REF_NAME}"
+          PREFIX=""
+          if [[ -n "$RAW_BRANCH" ]]; then
+            # Sanitize: lowercase, replace invalid tag chars with '-', trim/collapse '-'
+            SAFE=$(echo "$RAW_BRANCH" \
+              | tr '[:upper:]' '[:lower:]' \
+              | sed -E 's/[^a-z0-9._-]+/-/g; s/^-+//; s/-+$//; s/-{2,}/-/g')
+            if [[ -n "$SAFE" ]]; then
+              PREFIX="${SAFE}-"
+            fi
+          fi
+          echo "sha_prefix=$PREFIX" >> "$GITHUB_OUTPUT"
+
       - name: Log in to Azure Container Registry (token)
         if: github.event_name != 'pull_request'
         uses: docker/login-action@v3
@@ -153,7 +171,7 @@ jobs:
           tags: |
             type=ref,event=branch
             type=ref,event=pr            
-            type=sha,format=short,prefix={{ if ne .Branch "" }}{{ .Branch }}-{{ end }}
+            type=sha,format=short,prefix=${{ steps.compute_prefix.outputs.sha_prefix }}
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/implementation/school-law' }}
 
       - name: Build and push Docker image

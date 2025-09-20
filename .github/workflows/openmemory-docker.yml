@@ -108,9 +108,10 @@ jobs:
 
       - id: choose
         run: |
-          matrix='${{ steps.set_matrix_manual.outputs.matrix }}'
-          any='${{ steps.set_matrix_manual.outputs.any_changed }}'
-          if [[ -z "$matrix" ]]; then
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            matrix='${{ steps.set_matrix_manual.outputs.matrix }}'
+            any='${{ steps.set_matrix_manual.outputs.any_changed }}'
+          else
             matrix='${{ steps.set_matrix_changed.outputs.matrix }}'
             any='${{ steps.set_matrix_changed.outputs.any_changed }}'
           fi

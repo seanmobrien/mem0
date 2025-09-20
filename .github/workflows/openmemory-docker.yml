@@ -66,15 +66,16 @@ jobs:
               - '.github/workflows/deployment-production.yml'
 
   # Generate service matrix based on changed components; this ensures we only build
-  # and push images for services that have relevant changes.
+  # and push images for services that have relevant changes, or all services on manual runs.
   generate_matrix:
     needs: check_changes
     runs-on: ubuntu-latest
     outputs:
-      matrix: ${{ steps.set_matrix.outputs.matrix }}
-      any_changed: ${{ steps.set_matrix.outputs.any_changed }}
+      matrix: ${{ steps.choose.outputs.matrix }}
+      any_changed: ${{ steps.choose.outputs.any_changed }}
     steps:
-      - id: set_matrix
+      - id: set_matrix_changed
+        if: github.event_name != 'workflow_dispatch'
         run: |
           matrix='['
           if [[ "${{ needs.check_changes.outputs.api_changed }}" == 'true' ]]; then
@@ -94,14 +95,36 @@ jobs:
             echo "any_changed=true" >> $GITHUB_OUTPUT
           fi
 
+      - id: set_matrix_manual
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          matrix='['
+          matrix+='{"service":"api","dockerfile":"openmemory/api/Dockerfile","context":".","image":"openmemory-api"},'
+          matrix+='{"service":"ui","dockerfile":"openmemory/ui/Dockerfile","context":"openmemory/ui","image":"openmemory-ui"},'
+          matrix+='{"service":"keycloak","dockerfile":"openmemory/keycloak/Dockerfile","context":"openmemory/keycloak","image":"openmemory-keycloak"},'
+          matrix="${matrix%,}]"
+          echo "matrix=$matrix" >> $GITHUB_OUTPUT
+          echo "any_changed=true" >> $GITHUB_OUTPUT
+
+      - id: choose
+        run: |
+          matrix='${{ steps.set_matrix_manual.outputs.matrix }}'
+          any='${{ steps.set_matrix_manual.outputs.any_changed }}'
+          if [[ -z "$matrix" ]]; then
+            matrix='${{ steps.set_matrix_changed.outputs.matrix }}'
+            any='${{ steps.set_matrix_changed.outputs.any_changed }}'
+          fi
+          [[ -z "$matrix" ]] && matrix='[]'
+          [[ -z "$any" ]] && any='false'
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+          echo "any_changed=$any" >> "$GITHUB_OUTPUT"
+
+
   # Build images for changed services and push to Azure Container Registry.
   build_and_push:
     needs: generate_matrix
     if: >-
-      (
-        github.event_name == 'workflow_dispatch' ||
-        needs.generate_matrix.outputs.any_changed == 'true'
-      ) && (
+      needs.generate_matrix.result == 'success' && needs.generate_matrix.outputs.any_changed == 'true' && (
         github.event_name == 'pull_request' ||
         github.ref == 'refs/heads/implementation/school-law' ||
         startsWith(github.ref, 'refs/tags/release/')

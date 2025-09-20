@@ -25,7 +25,7 @@ COPY --chown=1000:1000 providers /opt/keycloak/providers
 
 # Configure Keycloak for production-ready deployment
 RUN chmod +x /opt/keycloak/start.sh && \
-    /opt/keycloak/bin/kc.sh build --features="declarative-ui,account_api,preview,token_exchange,admin-fine-grained-authz" && \
+    /opt/keycloak/bin/kc.sh build && \
     /opt/keycloak/bin/kc.sh show-config
 
 # Expose ports

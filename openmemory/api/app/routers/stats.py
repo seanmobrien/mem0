@@ -15,6 +15,7 @@ from app.auth import get_current_user, get_user_record, check_auth_service_healt
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1/stats", tags=["stats"])
+healthcheck_user = "system_healthcheck"
 
 @router.get("/")
 async def get_profile(
@@ -209,7 +210,7 @@ async def health_check(
                         graph_enabled = True
                         if graphProvider is None:
                             from mem0.memory.graph_memory import MemoryGraph
-                            graphProvider = MemoryGraph(config)                        
+                            graphProvider = MemoryGraph(config)
                         graph_store_available = graphProvider is not None
             except Exception as e:
                 logger.error(f"Graph Store connection error: {str(e)}")
@@ -278,3 +279,158 @@ async def health_check(
             "errors": errors
         }
     }
+
+@router.get(
+    "/health-check/graph",
+    responses={
+        200: {
+            "description": "Graph health status",
+            "content": {
+                "application/json": {
+                    "schema": {
+                        "title": "GraphHealthStatus",
+                        "type": "object",
+                        "properties": {
+                            "online": {"type": "boolean"},
+                            "can_add": {"type": "boolean"},
+                            "can_search": {"type": "boolean"},
+                            "can_delete": {"type": "boolean"},
+                            "details": {
+                                "title": "GraphHealthDetails",
+                                "type": "object",
+                                "properties": {
+                                    "errors": {"type": "array", "items": {"type": "string"}},
+                                    "timestamp": {"type": "string"},
+                                    "add_result": {"nullable": True},
+                                    "search_result": {"nullable": True},
+                                },
+                                "required": ["errors", "timestamp"],
+                            },
+                        },
+                        "required": ["online", "can_add", "can_search", "can_delete", "details"],
+                    }
+                }
+            },
+        },
+        422: {
+            "description": "Graph health check error",
+            "content": {
+                "application/json": {
+                    "schema": {
+                        "title": "GraphHealthErrorResponse",
+                        "type": "object",
+                        "properties": {
+                            "detail": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "loc": {"type": "array", "items": {"type": "string"}},
+                                        "msg": {"type": "string"},
+                                        "type": {"type": "string"},
+                                    },
+                                    "required": ["loc", "msg", "type"],
+                                },
+                            }
+                        },
+                        "required": ["detail"],
+                    }
+                }
+            },
+        },
+    },
+)
+async def graph_health_check() -> "GraphHealthStatus":
+    """
+    Graph memory health check endpoint to verify graph store functionality.
+    Returns status of graph connectivity and basic operations (add, search, delete).
+    """
+    try:
+        # Initialize response structure
+        health_status = GraphHealthStatus(
+            online=False,
+            can_add=False,
+            can_search=False,
+            can_delete=False,
+            details=GraphHealthDetails(
+                errors=[],
+                timestamp=datetime.now(timezone.utc).isoformat(),
+            ),
+        )
+
+        # Step 1: Check if graph client is available
+        try:
+            memory_client = get_memory_client()
+            if memory_client is None:
+                health_status.details.errors.append("Memory client is not available")
+                return health_status
+
+            graph_client = getattr(memory_client, "graph", None)
+            if graph_client is None:
+                health_status.details.errors.append("Graph client is not available on memory client")
+                return health_status
+
+            health_status.online = True
+
+        except Exception as e:
+            health_status.details.errors.append(f"Failed to get graph client: {str(e)}")
+            return health_status
+
+        # Prepare test data and filters
+        test_data = "Health check test: John likes apples and Mary likes oranges."
+        filters = {"user_id": healthcheck_user}
+
+        # Step 2: Test add functionality
+        try:
+            add_result = graph_client.add(test_data, filters)
+            health_status.can_add = True
+            health_status.details.add_result = add_result
+        except Exception as e:
+            health_status.details.errors.append(f"Add operation failed: {str(e)}")
+
+        # Step 3: Test search functionality
+        try:
+            search_result = graph_client.search("John likes apples", filters)
+            if health_status.can_add:
+                health_status.can_search = bool(search_result)
+            else:
+                health_status.can_search = True
+            health_status.details.search_result = search_result
+        except Exception as e:
+            health_status.details.errors.append(f"Search operation failed: {str(e)}")
+
+        # Step 4: Test delete functionality
+        try:
+            graph_client.delete_all(filters)
+            health_status.can_delete = True
+        except Exception as e:
+            health_status.details.errors.append(f"Delete operation failed: {str(e)}")
+
+        return health_status
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=422,
+            detail=[
+                {
+                    "loc": ["graph_health_check"],
+                    "msg": f"Unexpected error during graph health check: {str(e)}",
+                    "type": "graph_health_error",
+                }
+            ],
+        )
+
+class GraphHealthDetails(BaseModel):
+    errors: List[str] = Field(default_factory=list)
+    timestamp: str
+    add_result: Optional[Any] = None
+    search_result: Optional[Any] = None
+
+
+class GraphHealthStatus(BaseModel):
+    online: bool
+    can_add: bool
+    can_search: bool
+    can_delete: bool
+    details: GraphHealthDetails
+    

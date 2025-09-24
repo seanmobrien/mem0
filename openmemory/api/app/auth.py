@@ -266,16 +266,21 @@ def check_auth_service_health() -> Dict[str, Any]:
     
     try:
         # Try to get well-known configuration
-        well_known_url = f"{KEYCLOAK_SERVER_URL}/realms/{KEYCLOAK_REALM}/.well-known/openid_configuration"
+        well_known_url = f"{KEYCLOAK_SERVER_URL}/realms/{KEYCLOAK_REALM}/.well-known/openid-configuration"
         response = requests.get(well_known_url, timeout=5)
         response.raise_for_status()
         
+        openid_config = get_keycloak_openid().well_known()
+
         return {
             "healthy": True,
             "enabled": True,
             "server_url": KEYCLOAK_SERVER_URL,
             "realm": KEYCLOAK_REALM,
-            "client_id": KEYCLOAK_CLIENT_ID
+            "client_id": KEYCLOAK_CLIENT_ID,
+            "auth_url": openid_config.get("authorization_endpoint"),
+            "token_url": openid_config.get("token_endpoint"),
+            "jkws_url": openid_config.get("jwks_uri")
         }
     except Exception as e:
         return {
@@ -283,5 +288,8 @@ def check_auth_service_health() -> Dict[str, Any]:
             "enabled": True,
             "error": str(e),
             "server_url": KEYCLOAK_SERVER_URL,
-            "realm": KEYCLOAK_REALM
+            "realm": KEYCLOAK_REALM,
+            "auth_url": None,
+            "token_url": None,
+            "jkws_url": None
         }

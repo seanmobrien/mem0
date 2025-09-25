@@ -12,6 +12,21 @@ import mem0
 from datetime import datetime, timezone
 from app.auth import get_current_user, get_user_record, check_auth_service_health
 
+class GraphHealthDetails(BaseModel):
+    errors: List[str] = Field(default_factory=list)
+    timestamp: str
+    add_result: Optional[Any] = None
+    search_result: Optional[Any] = None
+
+
+class GraphHealthStatus(BaseModel):
+    online: bool
+    can_add: bool
+    can_search: bool
+    can_delete: bool
+    details: GraphHealthDetails
+    
+
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1/stats", tags=["stats"])
@@ -420,17 +435,3 @@ async def graph_health_check() -> "GraphHealthStatus":
             ],
         )
 
-class GraphHealthDetails(BaseModel):
-    errors: List[str] = Field(default_factory=list)
-    timestamp: str
-    add_result: Optional[Any] = None
-    search_result: Optional[Any] = None
-
-
-class GraphHealthStatus(BaseModel):
-    online: bool
-    can_add: bool
-    can_search: bool
-    can_delete: bool
-    details: GraphHealthDetails
-    

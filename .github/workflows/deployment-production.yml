@@ -152,6 +152,7 @@ jobs:
               api) echo "mem0-api" ;;
               ui) echo "mem0-ui" ;;
               keycloak) echo "login" ;;
+              neo4j) echo "neo4j" ;;
               *) echo "$svc" ;;
             esac
           }
@@ -164,6 +165,9 @@ jobs:
                 ;;
               api) 
                 echo "PGVECTOR_HOST=\${{ vars.PGVECTOR_HOST }},LLM_AZURE_OPENAI_API_KEY=secretRef:openai-schoollaw-1k-key1,LLM_AZURE_API_VERSION=\${{ vars.LLM_AZURE_API_VERSION }},LLM_AZURE_DEPLOYMENT=\${{ vars.LLM_AZURE_DEPLOYMENT }},LLM_AZURE_ENDPOINT=\${{ vars.LLM_AZURE_ENDPOINT }},USER=\${{ vars.USER }},GRAPH_URI=\${{ vars.GRAPH_URI }},GRAPH_USERNAME=\${{ vars.GRAPH_USERNAME }},GRAPH_PASSWORD=secretRef:neo4j-password,NEXT_PUBLIC_URL=\${{ vars.NEXT_PUBLIC_URL }},PUBLIC_URL=\${{ vars.PUBLIC_URL }},VERCEL=\${{ vars.VERCEL }},PGVECTOR_USER=\${{ vars.PGVECTOR_USER }},EMBEDDING_AZURE_ENDPOINT=\${{ vars.EMBEDDING_AZURE_ENDPOINT }},PGVECTOR_PORT=\${{ vars.PGVECTOR_PORT }},PGVECTOR_DB=\${{ vars.PGVECTOR_DB }},PGVECTOR_COLLECTION_NAME=\${{ vars.PGVECTOR_COLLECTION_NAME }},PGVECTOR_DISKANN=\${{ vars.PGVECTOR_DISKANN }},MEMGRAPH_USERNAME=\${{ vars.MEMGRAPH_USERNAME }},EMBEDDING_AZURE_API_VERSION=\${{ vars.EMBEDDING_AZURE_API_VERSION }},EMBEDDING_AZURE_DEPLOYMENT=\${{ vars.EMBEDDING_AZURE_DEPLOYMENT }},OPENAI_API_KEY=secretRef:openai-schoollawbot-1k-switzerland-key1,EMBEDDING_AZURE_OPENAI_API_KEY=secretRef:openai-schoollaw-embedding,PGVECTOR_PASSWORD=secretRef:postgresql-password,DATABASE_URL=\${{ vars.DATABASE_URL }},MEM0_PROVIDER_VECTORSTORE=\${{ vars.MEM0_PROVIDER_VECTORSTORE }},MEM0_PROVIDER_GRAPHSTORE=\${{ vars.MEM0_PROVIDER_GRAPHSTORE }},MEM0_PROVIDER_LLM=\${{ vars.MEM0_PROVIDER_LLM }},PG_HNSW=\${{ vars.PG_HNSW }},PG_TIMESCALE=\${{ vars.PG_TIMESCALE }},KEYCLOAK_SERVER_URL=\${{ vars.KEYCLOAK_SERVER_URL }},KEYCLOAK_REALM=\${{ vars.KEYCLOAK_REALM }},KEYCLOAK_CLIENT_ID=secretRef:keystore-client-id,KEYCLOAK_CLIENT_SECRET=secretRef:keystore-client-secret,AUTH_ENABLED=\${{ vars.AUTH_ENABLED }}"
+                ;;
+              neo4j)
+                echo "NEO4J_AUTH=secretRef:neo4j-password,NEO4J_ACCEPT_LICENSE_AGREEMENT=yes"
                 ;;
               *) 
                 echo ""
@@ -199,17 +203,9 @@ jobs:
           matrix="${matrix%,}]"
           echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
 
-          # 4) Gate by trigger type and branch:
-          #    - Always deploy for workflow_dispatch (manual trigger)
-          #    - For workflow_run triggers, only deploy if branch starts with 'implementation/'
-          should=false
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            # Manual trigger - always deploy
-            should=true
-          elif [[ "${{ github.event_name }}" == "workflow_run" && "$branch_ref" == implementation/* ]]; then
-            # Automatic trigger from build workflow - only deploy implementation/* branches
-            should=true
-          fi
+          # 4) Always deploy - no gating logic
+          #    Deploy for all triggers and branches
+          should=true
           echo "should_deploy=$should" >> "$GITHUB_OUTPUT"
 
       - name: Summarize deploy plan

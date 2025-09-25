@@ -30,6 +30,7 @@ env:
   UI_IMAGE_NAME: openmemory-ui
   SRV_IMAGE_NAME: openmemory-mem0
   KEYCLOAK_IMAGE_NAME: openmemory-keycloak
+  NEO4J_IMAGE_NAME: openmemory-neo4j
 
 jobs:
   # Check which services have been changed in this push.
@@ -42,6 +43,7 @@ jobs:
       api_changed: ${{ steps.filter.outputs.api }}
       ui_changed: ${{ steps.filter.outputs.ui }}
       keycloak_changed: ${{ steps.filter.outputs.keycloak }}
+      neo4j_changed: ${{ steps.filter.outputs.neo4j }}
     steps:
       - uses: actions/checkout@v4
       - id: filter
@@ -62,6 +64,10 @@ jobs:
               - '.github/workflows/deployment-production.yml'
             keycloak:
               - 'openmemory/keycloak/**'
+              - '.github/workflows/openmemory-docker.yml'
+              - '.github/workflows/deployment-production.yml'
+            neo4j:
+              - 'openmemory/neo4j/**'
               - '.github/workflows/openmemory-docker.yml'
               - '.github/workflows/deployment-production.yml'
 
@@ -87,6 +93,9 @@ jobs:
           if [[ "${{ needs.check_changes.outputs.keycloak_changed }}" == 'true' ]]; then
             matrix+='{"service":"keycloak","dockerfile":"openmemory/keycloak/Dockerfile","context":"openmemory/keycloak","image":"openmemory-keycloak"},'
           fi
+          if [[ "${{ needs.check_changes.outputs.neo4j_changed }}" == 'true' ]]; then
+            matrix+='{"service":"neo4j","dockerfile":"openmemory/neo4j/Dockerfile","context":"openmemory/neo4j","image":"openmemory-neo4j"},'
+          fi
           matrix="${matrix%,}]"
           echo "matrix=$matrix" >> $GITHUB_OUTPUT
           if [[ "$matrix" == '[]' ]]; then
@@ -102,6 +111,7 @@ jobs:
           matrix+='{"service":"api","dockerfile":"openmemory/api/Dockerfile","context":".","image":"openmemory-api"},'
           matrix+='{"service":"ui","dockerfile":"openmemory/ui/Dockerfile","context":"openmemory/ui","image":"openmemory-ui"},'
           matrix+='{"service":"keycloak","dockerfile":"openmemory/keycloak/Dockerfile","context":"openmemory/keycloak","image":"openmemory-keycloak"},'
+          matrix+='{"service":"neo4j","dockerfile":"openmemory/neo4j/Dockerfile","context":"openmemory/neo4j","image":"openmemory-neo4j"},'
           matrix="${matrix%,}]"
           echo "matrix=$matrix" >> $GITHUB_OUTPUT
           echo "any_changed=true" >> $GITHUB_OUTPUT

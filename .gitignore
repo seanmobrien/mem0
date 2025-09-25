@@ -194,3 +194,6 @@ claude_desktop_config.json
 # IDEs
 .vscode
 **/.vscode/** 
+
+# secrets
+secrets

@@ -130,7 +130,6 @@ jobs:
           echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
           echo "any_changed=$any" >> "$GITHUB_OUTPUT"
 
-
   # Build images for changed services and push to Azure Container Registry.
   build_and_push:
     needs: generate_matrix
@@ -239,7 +238,9 @@ jobs:
       - name: Write output digest to metadata file
         if: github.event_name != 'pull_request'
         run: |
-          echo '{"service": "${{ matrix.service }}", "image": "${{ matrix.image }}", "branch": "${{ github.ref_name }}", "tag": "${{ steps.meta.outputs.tags }}"}' > metadata.json
+          # Extract the last tag (should be the SHA-prefixed one) and clean it
+          LAST_TAG=$(echo '${{ steps.meta.outputs.tags }}' | tr '\r\n' '\n' | tail -n1 | tr -d '\r\n' | xargs)
+          echo "{\"service\": \"${{ matrix.service }}\", \"image\": \"${{ matrix.image }}\", \"branch\": \"${{ github.ref_name }}\", \"tag\": \"$LAST_TAG\"}" > metadata.json
 
       - name: Upload build metadata artifact
         if: github.event_name != 'pull_request'

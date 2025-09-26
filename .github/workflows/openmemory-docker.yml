@@ -56,20 +56,20 @@ jobs:
               - 'pyproject.toml'
               - 'build_local.py'
               - '.github/workflows/openmemory-docker.yml'
-              - '.github/workflows/deployment-production.yml'
+              - '.github/workflows/deployment-*.yml'
             ui:
               - 'openmemory/ui/**'
               - 'mem0/**'
               - '.github/workflows/openmemory-docker.yml'
-              - '.github/workflows/deployment-production.yml'
+              - '.github/workflows/deployment-*.yml'
             keycloak:
               - 'openmemory/keycloak/**'
               - '.github/workflows/openmemory-docker.yml'
-              - '.github/workflows/deployment-production.yml'
+              - '.github/workflows/deployment-*.yml'
             neo4j:
               - 'openmemory/neo4j/**'
               - '.github/workflows/openmemory-docker.yml'
-              - '.github/workflows/deployment-production.yml'
+              - '.github/workflows/deployment-*.yml'
 
   # Generate service matrix based on changed components; this ensures we only build
   # and push images for services that have relevant changes, or all services on manual runs.

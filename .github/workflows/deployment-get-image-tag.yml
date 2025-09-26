@@ -6,15 +6,15 @@ on:
       run-id:
         required: false
         type: string
-        description: 'Optional run ID to download artifacts from. If not provided, will find latest successful run.'
+        description: "Optional run ID to download artifacts from. If not provided, will find latest successful run."
       service-name:
         required: true
         type: string
-        description: 'Service name to get image tag for (api, ui, keycloak, neo4j)'
+        description: "Service name to get image tag for (api, ui, keycloak, neo4j)"
     outputs:
       image-tag:
         value: ${{ jobs.get-tag.outputs.image-tag }}
-        description: 'Image tag for the service, or empty string if not found'
+        description: "Image tag for the service, or empty string if not found"
 
 jobs:
   get-tag:
@@ -99,10 +99,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          
+
           SERVICE_NAME="${{ inputs.service-name }}"
           METADATA_FILE="artifacts/${SERVICE_NAME}-metadata.json"
-          
+
           # Check if metadata file exists
           if [[ ! -f "$METADATA_FILE" ]]; then
             echo "Metadata file not found: $METADATA_FILE"
@@ -111,7 +111,7 @@ jobs:
             echo "image-tag=" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          
+
           # Extract tag from metadata JSON
           # Handle both single line and multi-line tag values
           TAG=$(jq -r '.tag // ""' "$METADATA_FILE")

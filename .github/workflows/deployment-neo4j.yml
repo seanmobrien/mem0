@@ -1,0 +1,51 @@
+name: Deploy Neo4j to Production
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: deploy-neo4j-production
+  cancel-in-progress: true
+
+on:
+  workflow_run:
+    workflows: ["OpenMemory Docker Build and Deploy"]
+    types: [completed]
+  workflow_dispatch:
+
+jobs:
+  get-image-tag:
+    uses: ./.github/workflows/deployment-get-image-tag.yml
+    with:
+      service-name: neo4j
+      run-id: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.id || '' }}
+    secrets: inherit
+
+  deploy:
+    needs: get-image-tag
+    if: needs.get-image-tag.outputs.image-tag != '' && ((github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    environment: Production
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Azure Login
+        uses: azure/login@v2.3.0
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          enable-AzPSSession: true
+          auth-type: IDENTITY
+
+      - name: Deploy Neo4j to container app
+        uses: azure/container-apps-deploy-action@v2
+        with:
+          imageToDeploy: schoollawregistry.azurecr.io/openmemory-neo4j:${{ needs.get-image-tag.outputs.image-tag }}
+          acrName: schoollawregistry
+          containerAppName: neo4j
+          containerAppEnvironment: ComplianceTheatre2000
+          resourceGroup: SchoolLawyer
+          environmentVariables: NEO4J_AUTH=secretRef:neo4j-password NEO4J_ACCEPT_LICENSE_AGREEMENT=yes

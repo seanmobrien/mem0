@@ -11,9 +11,9 @@ concurrency:
   cancel-in-progress: true
 
 on:
-  workflow_run:
-    workflows: ["OpenMemory Docker Build and Deploy"]
-    types: [completed]
+  #workflow_run:
+  #  workflows: ["OpenMemory Docker Build and Deploy"]
+  #  types: [completed]
   workflow_dispatch:
 
 jobs:

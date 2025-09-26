@@ -107,7 +107,7 @@ jobs:
           set -euo pipefail
 
           SERVICE_NAME="${{ inputs.service-name }}"
-          METADATA_FILE="artifacts/${SERVICE_NAME}-metadata.json"
+          METADATA_FILE="artifacts/${SERVICE_NAME}-metadata/metadata.json"
 
           if [[ ! -f "$METADATA_FILE" ]]; then
             echo "Metadata file not found: $METADATA_FILE"

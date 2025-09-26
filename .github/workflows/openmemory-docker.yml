@@ -239,8 +239,16 @@ jobs:
         if: github.event_name != 'pull_request'
         run: |
           # Extract the last tag (should be the SHA-prefixed one) and clean it
-          LAST_TAG=$(echo '${{ steps.meta.outputs.tags }}' | tr '\r\n' '\n' | tail -n1 | tr -d '\r\n' | xargs)
-          echo "{\"service\": \"${{ matrix.service }}\", \"image\": \"${{ matrix.image }}\", \"branch\": \"${{ github.ref_name }}\", \"tag\": \"$LAST_TAG\"}" > metadata.json
+          LAST_FULL_TAG=$(echo '${{ steps.meta.outputs.tags }}' | tr '\r\n' '\n' | tail -n1 | tr -d '\r\n' | xargs)
+          # Check if the tag has duplication and fix it
+          if [[ "$LAST_FULL_TAG" == *":${{ env.REGISTRY }}/${{ matrix.image }}:"* ]]; then
+            # Fix duplicated registry/image in tag - extract just the actual tag part
+            ACTUAL_TAG=$(echo "$LAST_FULL_TAG" | sed 's/.*://' | sed 's/.*://')
+            CLEAN_TAG="${{ env.REGISTRY }}/${{ matrix.image }}:$ACTUAL_TAG"
+          else
+            CLEAN_TAG="$LAST_FULL_TAG"
+          fi
+          echo "{\"service\": \"${{ matrix.service }}\", \"image\": \"${{ matrix.image }}\", \"branch\": \"${{ github.ref_name }}\", \"tag\": \"$CLEAN_TAG\"}" > metadata.json
 
       - name: Upload build metadata artifact
         if: github.event_name != 'pull_request'

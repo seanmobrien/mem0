@@ -11,6 +11,14 @@ on:
         required: true
         type: string
         description: "Service name to get image tag for (api, ui, keycloak, neo4j)"
+      target-ref:
+        required: false
+        type: string
+        description: "Target ref (branch/tag) to find artifacts for. If not provided, uses current ref."
+      target-ref-name:
+        required: false
+        type: string
+        description: "Target ref name to find artifacts for. If not provided, uses current ref name."
     outputs:
       image-tag:
         value: ${{ jobs.get-tag.outputs.image-tag }}
@@ -31,9 +39,6 @@ jobs:
           path: artifacts
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      # When no run-id is provided, locate the latest successful run of
-      # "OpenMemory Docker Build and Deploy" for the same ref (branch/tag)
-      # and download its artifacts
       - name: Resolve and download artifacts for latest successful run
         if: inputs.run-id == ''
         shell: bash
@@ -41,13 +46,20 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          # Context used to locate build artifacts for the same branch/tag
+          # Use target ref if provided, otherwise fall back to current ref
+          if [[ -n "${{ inputs.target-ref }}" ]]; then
+            REF='${{ inputs.target-ref }}'
+            REF_NAME='${{ inputs.target-ref-name }}'
+          else
+            REF='${{ github.ref }}'
+            REF_NAME='${{ github.ref_name }}'
+          fi
+
           OWNER_REPO='${{ github.repository }}'
           WORKFLOW_NAME='OpenMemory Docker Build and Deploy'
-          REF='${{ github.ref }}'
-          REF_NAME='${{ github.ref_name }}'
 
-          # Find workflow id by name
+          echo "Looking for artifacts from ref: $REF (name: $REF_NAME)"
+
           WF_ID=$(gh api -q ".workflows[] | select(.name==\"${WORKFLOW_NAME}\").id" \
             repos/${OWNER_REPO}/actions/workflows || true)
           if [[ -z "$WF_ID" ]]; then
@@ -55,18 +67,14 @@ jobs:
             exit 0
           fi
 
-          # List recent runs for that workflow
           RUNS_JSON=$(gh api repos/${OWNER_REPO}/actions/workflows/${WF_ID}/runs --paginate -q '.workflow_runs[] | {id, event, conclusion, head_branch, head_sha, run_number, created_at}' | jq -s .)
 
-          # Determine matching run for branch or tag
           RUN_ID=""
           if [[ "$REF" == refs/heads/* ]]; then
-            # Latest successful run for the same branch
             RUN_ID=$(echo "$RUNS_JSON" | jq -r \
               "map(select((.event==\"push\" or .event==\"workflow_dispatch\") and .conclusion==\"success\" and .head_branch==\"$REF_NAME\")) | sort_by(.created_at) | last | .id // \"\"")
           elif [[ "$REF" == refs/tags/* ]]; then
             TAG_NAME="$REF_NAME"
-            # Resolve commit SHA for the tag
             TAG_OBJ=$(gh api repos/${OWNER_REPO}/git/ref/tags/${TAG_NAME} || true)
             COMMIT_SHA=""
             if [[ -n "$TAG_OBJ" ]]; then
@@ -79,7 +87,6 @@ jobs:
               fi
             fi
             if [[ -n "$COMMIT_SHA" ]]; then
-              # Latest successful run built from the same commit
               RUN_ID=$(echo "$RUNS_JSON" | jq -r \
                 "map(select((.event==\"push\" or .event==\"workflow_dispatch\") and .conclusion==\"success\" and .head_sha==\"$COMMIT_SHA\")) | sort_by(.created_at) | last | .id // \"\"")
             fi
@@ -90,7 +97,6 @@ jobs:
             exit 0
           fi
 
-          # Download all artifacts from the identified build run
           echo "Downloading artifacts from run $RUN_ID ..."
           gh run download "$RUN_ID" --repo "$OWNER_REPO" -D artifacts || true
 
@@ -103,7 +109,6 @@ jobs:
           SERVICE_NAME="${{ inputs.service-name }}"
           METADATA_FILE="artifacts/${SERVICE_NAME}-metadata/metadata.json"
 
-          # Check if metadata file exists
           if [[ ! -f "$METADATA_FILE" ]]; then
             echo "Metadata file not found: $METADATA_FILE"
             echo "Available files in artifacts:"
@@ -112,12 +117,8 @@ jobs:
             exit 0
           fi
 
-          # Extract tag from metadata JSON
-          # Handle both single line and multi-line tag values
           TAG=$(jq -r '.tag // ""' "$METADATA_FILE")
           if [[ -n "$TAG" && "$TAG" != "null" ]]; then
-            # If tag contains multiple lines, prefer the one with branch-shortSHA format
-            # Otherwise take the first non-empty line
             CLEAN_TAG=$(echo "$TAG" | tr '\r' '\n' | grep -E '[-_A-Za-z0-9.]+-[0-9a-f]{7,8}$' | head -n1 || true)
             if [[ -z "$CLEAN_TAG" ]]; then
               CLEAN_TAG=$(echo "$TAG" | tr '\r' '\n' | grep -E '\S' | head -n1 || true)

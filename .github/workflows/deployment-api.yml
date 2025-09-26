@@ -20,6 +20,8 @@ jobs:
     with:
       service-name: api
       run-id: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.id || '' }}
+      target-ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_branch && format('refs/heads/{0}', github.event.workflow_run.head_branch) || '' }}
+      target-ref-name: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_branch || '' }}
     secrets: inherit
 
   deploy:

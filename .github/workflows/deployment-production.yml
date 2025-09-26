@@ -157,20 +157,15 @@ jobs:
             esac
           }
 
+          # Helper function to check if service needs environment variables
           map_envvars() {
             local svc="$1"
             case "$svc" in
-              keycloak) 
-                echo "KC_HOSTNAME=\${{ vars.KC_HOSTNAME }},KC_LOG_LEVEL=INFO,KC_DB_URL_DATABASE=\${{ vars.KC_DB_URL_DATABASE }},KC_DB_USERNAME=keycloak_user,KC_DB_URL_HOST=\${{ vars.KC_DB_URL_HOST }},KC_DB_PASSWORD=secretRef:db-login-password,KC_HTTP_ENABLED=true,KC_HTTPS_PORT=8443,KEYCLOAK_ADMIN=dog,KEYCLOAK_ADMIN_PASSWORD=secretRef:kc-admin-password,KC_HTTP_PORT=8080,KC_PII_ENCKEY=secretRef:kc-pii-enckey"
-                ;;
-              api) 
-                echo "PGVECTOR_HOST=\${{ vars.PGVECTOR_HOST }},LLM_AZURE_OPENAI_API_KEY=secretRef:openai-schoollaw-1k-key1,LLM_AZURE_API_VERSION=\${{ vars.LLM_AZURE_API_VERSION }},LLM_AZURE_DEPLOYMENT=\${{ vars.LLM_AZURE_DEPLOYMENT }},LLM_AZURE_ENDPOINT=\${{ vars.LLM_AZURE_ENDPOINT }},USER=\${{ vars.USER }},GRAPH_URI=\${{ vars.GRAPH_URI }},GRAPH_USERNAME=\${{ vars.GRAPH_USERNAME }},GRAPH_PASSWORD=secretRef:neo4j-password,NEXT_PUBLIC_URL=\${{ vars.NEXT_PUBLIC_URL }},PUBLIC_URL=\${{ vars.PUBLIC_URL }},VERCEL=\${{ vars.VERCEL }},PGVECTOR_USER=\${{ vars.PGVECTOR_USER }},EMBEDDING_AZURE_ENDPOINT=\${{ vars.EMBEDDING_AZURE_ENDPOINT }},PGVECTOR_PORT=\${{ vars.PGVECTOR_PORT }},PGVECTOR_DB=\${{ vars.PGVECTOR_DB }},PGVECTOR_COLLECTION_NAME=\${{ vars.PGVECTOR_COLLECTION_NAME }},PGVECTOR_DISKANN=\${{ vars.PGVECTOR_DISKANN }},MEMGRAPH_USERNAME=\${{ vars.MEMGRAPH_USERNAME }},EMBEDDING_AZURE_API_VERSION=\${{ vars.EMBEDDING_AZURE_API_VERSION }},EMBEDDING_AZURE_DEPLOYMENT=\${{ vars.EMBEDDING_AZURE_DEPLOYMENT }},OPENAI_API_KEY=secretRef:openai-schoollawbot-1k-switzerland-key1,EMBEDDING_AZURE_OPENAI_API_KEY=secretRef:openai-schoollaw-embedding,PGVECTOR_PASSWORD=secretRef:postgresql-password,DATABASE_URL=\${{ vars.DATABASE_URL }},MEM0_PROVIDER_VECTORSTORE=\${{ vars.MEM0_PROVIDER_VECTORSTORE }},MEM0_PROVIDER_GRAPHSTORE=\${{ vars.MEM0_PROVIDER_GRAPHSTORE }},MEM0_PROVIDER_LLM=\${{ vars.MEM0_PROVIDER_LLM }},PG_HNSW=\${{ vars.PG_HNSW }},PG_TIMESCALE=\${{ vars.PG_TIMESCALE }},KEYCLOAK_SERVER_URL=\${{ vars.KEYCLOAK_SERVER_URL }},KEYCLOAK_REALM=\${{ vars.KEYCLOAK_REALM }},KEYCLOAK_CLIENT_ID=secretRef:keystore-client-id,KEYCLOAK_CLIENT_SECRET=secretRef:keystore-client-secret,AUTH_ENABLED=\${{ vars.AUTH_ENABLED }}"
-                ;;
-              neo4j)
-                echo "NEO4J_AUTH=secretRef:neo4j-password,NEO4J_ACCEPT_LICENSE_AGREEMENT=yes"
+              keycloak|api|neo4j) 
+                echo "true"
                 ;;
               *) 
-                echo ""
+                echo "false"
                 ;;
             esac
           }
@@ -253,8 +248,8 @@ jobs:
 
       # Tag is provided by build metadata via the dynamic matrix (matrix.tag)
 
-      - name: Deploy ${{ matrix.image}} to ${{ matrix.containerAppName }} (with environment variables)
-        if: matrix.envVars != ''
+      - name: Deploy ${{ matrix.image}} to keycloak container app
+        if: matrix.containerAppName == 'login'
         uses: azure/container-apps-deploy-action@v2
         with:
           imageToDeploy: schoollawregistry.azurecr.io/${{ matrix.image }}:${{ matrix.tag }}
@@ -262,10 +257,32 @@ jobs:
           containerAppName: ${{ matrix.containerAppName }}
           containerAppEnvironment: ComplianceTheatre2000
           resourceGroup: SchoolLawyer
-          environmentVariables: ${{ matrix.envVars }}
+          environmentVariables: KC_HOSTNAME=${{ vars.KC_HOSTNAME }} KC_LOG_LEVEL=INFO KC_DB_URL_DATABASE=${{ vars.KC_DB_URL_DATABASE }} KC_DB_USERNAME=keycloak_user KC_DB_URL_HOST=${{ vars.KC_DB_URL_HOST }} KC_DB_PASSWORD=secretRef:db-login-password KC_HTTP_ENABLED=true KC_HTTPS_PORT=8443 KEYCLOAK_ADMIN=dog KEYCLOAK_ADMIN_PASSWORD=secretRef:kc-admin-password KC_HTTP_PORT=8080 KC_PII_ENCKEY=secretRef:kc-pii-enckey
 
-      - name: Deploy ${{ matrix.image}} to ${{ matrix.containerAppName }} (no environment variables)
-        if: matrix.envVars == ''
+      - name: Deploy ${{ matrix.image}} to API container app
+        if: matrix.containerAppName == 'mem0-api'
+        uses: azure/container-apps-deploy-action@v2
+        with:
+          imageToDeploy: schoollawregistry.azurecr.io/${{ matrix.image }}:${{ matrix.tag }}
+          acrName: schoollawregistry
+          containerAppName: ${{ matrix.containerAppName }}
+          containerAppEnvironment: ComplianceTheatre2000
+          resourceGroup: SchoolLawyer
+          environmentVariables: PGVECTOR_HOST=${{ vars.PGVECTOR_HOST }} LLM_AZURE_OPENAI_API_KEY=secretRef:openai-schoollaw-1k-key1 LLM_AZURE_API_VERSION=${{ vars.LLM_AZURE_API_VERSION }} LLM_AZURE_DEPLOYMENT=${{ vars.LLM_AZURE_DEPLOYMENT }} LLM_AZURE_ENDPOINT=${{ vars.LLM_AZURE_ENDPOINT }} USER=${{ vars.USER }} GRAPH_URI=${{ vars.GRAPH_URI }} GRAPH_USERNAME=${{ vars.GRAPH_USERNAME }} GRAPH_PASSWORD=secretRef:neo4j-password NEXT_PUBLIC_URL=${{ vars.NEXT_PUBLIC_URL }} PUBLIC_URL=${{ vars.PUBLIC_URL }} VERCEL=${{ vars.VERCEL }} PGVECTOR_USER=${{ vars.PGVECTOR_USER }} EMBEDDING_AZURE_ENDPOINT=${{ vars.EMBEDDING_AZURE_ENDPOINT }} PGVECTOR_PORT=${{ vars.PGVECTOR_PORT }} PGVECTOR_DB=${{ vars.PGVECTOR_DB }} PGVECTOR_COLLECTION_NAME=${{ vars.PGVECTOR_COLLECTION_NAME }} PGVECTOR_DISKANN=${{ vars.PGVECTOR_DISKANN }} MEMGRAPH_USERNAME=${{ vars.MEMGRAPH_USERNAME }} EMBEDDING_AZURE_API_VERSION=${{ vars.EMBEDDING_AZURE_API_VERSION }} EMBEDDING_AZURE_DEPLOYMENT=${{ vars.EMBEDDING_AZURE_DEPLOYMENT }} OPENAI_API_KEY=secretRef:openai-schoollawbot-1k-switzerland-key1 EMBEDDING_AZURE_OPENAI_API_KEY=secretRef:openai-schoollaw-embedding PGVECTOR_PASSWORD=secretRef:postgresql-password DATABASE_URL=${{ vars.DATABASE_URL }} MEM0_PROVIDER_VECTORSTORE=${{ vars.MEM0_PROVIDER_VECTORSTORE }} MEM0_PROVIDER_GRAPHSTORE=${{ vars.MEM0_PROVIDER_GRAPHSTORE }} MEM0_PROVIDER_LLM=${{ vars.MEM0_PROVIDER_LLM }} PG_HNSW=${{ vars.PG_HNSW }} PG_TIMESCALE=${{ vars.PG_TIMESCALE }} KEYCLOAK_SERVER_URL=${{ vars.KEYCLOAK_SERVER_URL }} KEYCLOAK_REALM=${{ vars.KEYCLOAK_REALM }} KEYCLOAK_CLIENT_ID=secretRef:keystore-client-id KEYCLOAK_CLIENT_SECRET=secretRef:keystore-client-secret AUTH_ENABLED=${{ vars.AUTH_ENABLED }}
+
+      - name: Deploy ${{ matrix.image}} to neo4j container app
+        if: matrix.containerAppName == 'neo4j'
+        uses: azure/container-apps-deploy-action@v2
+        with:
+          imageToDeploy: schoollawregistry.azurecr.io/${{ matrix.image }}:${{ matrix.tag }}
+          acrName: schoollawregistry
+          containerAppName: ${{ matrix.containerAppName }}
+          containerAppEnvironment: ComplianceTheatre2000
+          resourceGroup: SchoolLawyer
+          environmentVariables: NEO4J_AUTH=secretRef:neo4j-password NEO4J_ACCEPT_LICENSE_AGREEMENT=yes
+
+      - name: Deploy ${{ matrix.image}} to container app (no environment variables)
+        if: matrix.envVars == 'false'
         uses: azure/container-apps-deploy-action@v2
         with:
           imageToDeploy: schoollawregistry.azurecr.io/${{ matrix.image }}:${{ matrix.tag }}

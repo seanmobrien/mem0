@@ -90,7 +90,7 @@ jobs:
             fi
             if [[ -n "$COMMIT_SHA" ]]; then
               # Latest successful run built from the same commit
-              RUN_ID=$(echo "$RUNS_JSON" | jq -r '
+              RUN_ID=$(echo "$RUNS_JSON" | jq -r ' \
                 map(select((.event=="push" or .event=="workflow_dispatch") and .conclusion=="success" and .head_sha=="'"$COMMIT_SHA"'")) | sort_by(.created_at) | last | .id // ""')
             fi
           fi

@@ -177,6 +177,19 @@ class MemoryAccessLog(Base):
         Index('idx_access_app_time', 'app_id', 'accessed_at'),
     )
 
+class GraphHealthDetails(BaseModel):
+    errors: List[str] = Field(default_factory=list)
+    timestamp: str
+    add_result: Optional[Any] = None
+    search_result: Optional[Any] = None
+    
+class GraphHealthStatus(BaseModel):
+    online: bool
+    can_add: bool
+    can_search: bool
+    can_delete: bool
+    details: GraphHealthDetails
+    
 def categorize_memory(memory: Memory, db: Session) -> None:
     """Categorize a memory using OpenAI and store the categories in the database."""
     try:

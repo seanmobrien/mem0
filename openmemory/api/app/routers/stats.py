@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 import logging
 from app.database import get_db
-from app.models import User, Memory, App, MemoryState
+from app.models import User, Memory, App, MemoryState, GraphHealthDetails, GraphHealthStatus
 from app.utils.memory import get_memory_client
 from typing import Optional
 from fastapi import Depends
@@ -11,21 +11,6 @@ from mem0.utils.factory import VectorStoreFactory
 import mem0
 from datetime import datetime, timezone
 from app.auth import get_current_user, get_user_record, check_auth_service_health
-
-class GraphHealthDetails(BaseModel):
-    errors: List[str] = Field(default_factory=list)
-    timestamp: str
-    add_result: Optional[Any] = None
-    search_result: Optional[Any] = None
-
-
-class GraphHealthStatus(BaseModel):
-    online: bool
-    can_add: bool
-    can_search: bool
-    can_delete: bool
-    details: GraphHealthDetails
-    
 
 
 logger = logging.getLogger(__name__)

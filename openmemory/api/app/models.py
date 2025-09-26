@@ -10,7 +10,8 @@ from sqlalchemy.orm import relationship
 from app.database import Base
 from sqlalchemy.orm import Session
 from app.utils.categorization import get_categories_for_memory
-
+from typing import List, Optional, Any
+from pydantic import BaseModel, Field
 
 def get_current_utc_time():
     """Get current UTC time"""

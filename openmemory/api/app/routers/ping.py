@@ -22,8 +22,6 @@ async def get_ping(
     projectId: Optional[str] = Query(None, description="Filter projects by ID")
 ):
     """Ping endpoint to check service health and return user info with projects"""
-        from sqlalchemy import func
-
     # Query user's apps with memory counts
     from sqlalchemy import func
     apps_query = db.query(

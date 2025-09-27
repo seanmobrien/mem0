@@ -238,17 +238,33 @@ jobs:
       - name: Write output digest to metadata file
         if: github.event_name != 'pull_request'
         run: |
-          # Extract the last tag (should be the SHA-prefixed one) and clean it
-          LAST_FULL_TAG=$(echo '${{ steps.meta.outputs.tags }}' | tr '\r\n' '\n' | tail -n1 | tr -d '\r\n' | xargs)
+          # Generate clean metadata with individual components
+          # This avoids complex tag parsing and lets deployment workflows construct what they need
 
-          # Extract just the actual tag part (everything after the final colon)
-          # This handles cases where the tag contains embedded registry/image references
-          ACTUAL_TAG="${LAST_FULL_TAG##*:}"
+          # Get short SHA (first 7 chars)
+          SHORT_SHA="${GITHUB_SHA:0:7}"
 
-          # Reconstruct the clean tag with proper registry/image:tag format
-          CLEAN_TAG="${{ env.REGISTRY }}/${{ matrix.image }}:$ACTUAL_TAG"
+          # Create branch-safe prefix for tag construction
+          RAW_BRANCH="${{ github.ref_name }}"
+          BRANCH_PREFIX=""
+          if [[ -n "$RAW_BRANCH" ]]; then
+            # Sanitize branch name for Docker tag (stepwise for clarity)
+            SAFE_LOWER=$(echo "$RAW_BRANCH" | tr '[:upper:]' '[:lower:]')
+            SAFE_ALNUM=$(echo "$SAFE_LOWER" | sed -E 's/[^a-z0-9._-]+/-/g')
+            SAFE_TRIM=$(echo "$SAFE_ALNUM" | sed -E 's/^-+|[-]+$//g')
+            SAFE=$(echo "$SAFE_TRIM" | sed -E 's/-{2,}/-/g')
+            if [[ -n "$SAFE" ]]; then
+              BRANCH_PREFIX="${SAFE}-"
+            fi
+          fi
 
-          echo "{\"service\": \"${{ matrix.service }}\", \"image\": \"${{ matrix.image }}\", \"branch\": \"${{ github.ref_name }}\", \"tag\": \"$CLEAN_TAG\"}" > metadata.json
+          # Construct the tag we want to use (branch-prefix + short SHA)
+          TAG="${BRANCH_PREFIX}${SHORT_SHA}"
+
+          echo "{\"service\": \"${{ matrix.service }}\", \"image\": \"${{ matrix.image }}\", \"branch\": \"${{ github.ref_name }}\", \"registry\": \"${{ env.REGISTRY }}\", \"tag\": \"$TAG\", \"sha\": \"$GITHUB_SHA\", \"short_sha\": \"$SHORT_SHA\", \"repository\": \"${{ github.repository }}\"}" > metadata.json
+
+          echo "Generated metadata for ${{ matrix.service }}:"
+          cat metadata.json
 
       - name: Upload build metadata artifact
         if: github.event_name != 'pull_request'

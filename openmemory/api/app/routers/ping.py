@@ -1,6 +1,6 @@
 from app.utils.client_config_factory import get_parsed_memory_config
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, func
 import logging
 from app.database import get_db
 from app.models import User, Memory, App, MemoryState, GraphHealthDetails, GraphHealthStatus

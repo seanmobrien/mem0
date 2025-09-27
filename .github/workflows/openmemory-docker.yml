@@ -240,14 +240,14 @@ jobs:
         run: |
           # Extract the last tag (should be the SHA-prefixed one) and clean it
           LAST_FULL_TAG=$(echo '${{ steps.meta.outputs.tags }}' | tr '\r\n' '\n' | tail -n1 | tr -d '\r\n' | xargs)
-          # Check if the tag has duplication and fix it
-          if [[ "$LAST_FULL_TAG" == *":${{ env.REGISTRY }}/${{ matrix.image }}:"* ]]; then
-            # Fix duplicated registry/image in tag - extract just the actual tag part
-            ACTUAL_TAG=$(echo "$LAST_FULL_TAG" | sed 's/.*://' | sed 's/.*://')
-            CLEAN_TAG="${{ env.REGISTRY }}/${{ matrix.image }}:$ACTUAL_TAG"
-          else
-            CLEAN_TAG="$LAST_FULL_TAG"
-          fi
+
+          # Extract just the actual tag part (everything after the final colon)
+          # This handles cases where the tag contains embedded registry/image references
+          ACTUAL_TAG="${LAST_FULL_TAG##*:}"
+
+          # Reconstruct the clean tag with proper registry/image:tag format
+          CLEAN_TAG="${{ env.REGISTRY }}/${{ matrix.image }}:$ACTUAL_TAG"
+
           echo "{\"service\": \"${{ matrix.service }}\", \"image\": \"${{ matrix.image }}\", \"branch\": \"${{ github.ref_name }}\", \"tag\": \"$CLEAN_TAG\"}" > metadata.json
 
       - name: Upload build metadata artifact

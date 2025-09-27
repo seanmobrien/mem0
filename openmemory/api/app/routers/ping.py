@@ -1,6 +1,6 @@
 from app.utils.client_config_factory import get_parsed_memory_config
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session, func
+from sqlalchemy.orm import Session
 import logging
 from app.database import get_db
 from app.models import User, Memory, App, MemoryState, GraphHealthDetails, GraphHealthStatus
@@ -22,7 +22,8 @@ async def get_ping(
     projectId: Optional[str] = Query(None, description="Filter projects by ID")
 ):
     """Ping endpoint to check service health and return user info with projects"""
-    
+        from sqlalchemy import func
+
     # Query user's apps with memory counts
     from sqlalchemy import func
     apps_query = db.query(

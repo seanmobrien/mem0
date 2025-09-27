@@ -248,8 +248,11 @@ jobs:
           RAW_BRANCH="${{ github.ref_name }}"
           BRANCH_PREFIX=""
           if [[ -n "$RAW_BRANCH" ]]; then
-            # Sanitize branch name for Docker tag
-            SAFE=$(echo "$RAW_BRANCH" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9._-]+/-/g' | sed -E 's/^-+|[-]+$//g' | sed -E 's/-{2,}/-/g')
+            # Sanitize branch name for Docker tag (stepwise for clarity)
+            SAFE_LOWER=$(echo "$RAW_BRANCH" | tr '[:upper:]' '[:lower:]')
+            SAFE_ALNUM=$(echo "$SAFE_LOWER" | sed -E 's/[^a-z0-9._-]+/-/g')
+            SAFE_TRIM=$(echo "$SAFE_ALNUM" | sed -E 's/^-+|[-]+$//g')
+            SAFE=$(echo "$SAFE_TRIM" | sed -E 's/-{2,}/-/g')
             if [[ -n "$SAFE" ]]; then
               BRANCH_PREFIX="${SAFE}-"
             fi

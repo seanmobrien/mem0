@@ -128,7 +128,7 @@ jobs:
             echo "image-tag=$FULL_IMAGE_REF" >> "$GITHUB_OUTPUT"
             echo "Found image reference for $SERVICE_NAME: $FULL_IMAGE_REF"
             echo "  Registry: $REGISTRY"
-            echo "  Image: $IMAGE" 
+            echo "  Image: $IMAGE"
             echo "  Tag: $TAG"
           else
             echo "image-tag=" >> "$GITHUB_OUTPUT"

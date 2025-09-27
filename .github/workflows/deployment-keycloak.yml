@@ -45,7 +45,7 @@ jobs:
       - name: Deploy Keycloak to container app
         uses: azure/container-apps-deploy-action@v2
         with:
-          imageToDeploy: schoollawregistry.azurecr.io/openmemory-keycloak:${{ needs.get-image-tag.outputs.image-tag }}
+          imageToDeploy: ${{ needs.get-image-tag.outputs.image-tag }}
           acrName: schoollawregistry
           containerAppName: login
           containerAppEnvironment: ComplianceTheatre2000

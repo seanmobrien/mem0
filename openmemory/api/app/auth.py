@@ -236,7 +236,7 @@ def get_user_record(current_user: Dict[str, Any] = Depends(get_current_user), db
     user = db.query(User).filter(User.user_id == current_user_id).first()
     if not user:
         new_user = User(
-            name=current_user.get("firstName", "") + " " + current_user.get("lastName", ""),
+            name=current_user.get("name"),
             email=current_user.get("email", None),
             user_id=current_user_id,
             metadata_= {},

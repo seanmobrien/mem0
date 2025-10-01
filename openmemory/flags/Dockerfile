@@ -3,7 +3,7 @@
 ###
 # Builder stage: grab the Flagsmith release and install dependencies
 ###
-ARG FLAGSMITH_VERSION=9.3.0
+ARG FLAGSMITH_VERSION=2.197.0
 FROM python:3.12-slim AS backend-builder
 ARG FLAGSMITH_VERSION
 

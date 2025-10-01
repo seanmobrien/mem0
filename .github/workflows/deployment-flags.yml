@@ -1,0 +1,52 @@
+name: Deploy Flags to Production
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: deploy-flags-production
+  cancel-in-progress: true
+
+on:
+  workflow_run:
+    workflows: ["OpenMemory Docker Build and Deploy"]
+    types: [completed]
+  workflow_dispatch:
+
+jobs:
+  get-image-tag:
+    uses: ./.github/workflows/deployment-get-image-tag.yml
+    with:
+      service-name: flags
+      run-id: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.id || '' }}
+      target-ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_branch && format('refs/heads/{0}', github.event.workflow_run.head_branch) || '' }}
+      target-ref-name: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_branch || '' }}
+    secrets: inherit
+
+  deploy:
+    needs: get-image-tag
+    if: needs.get-image-tag.outputs.image-tag != '' && ((github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    environment: Production
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Azure Login
+        uses: azure/login@v2.3.0
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          enable-AzPSSession: true
+
+      - name: Deploy Flagsmith to container app
+        uses: azure/container-apps-deploy-action@v2
+        with:
+          imageToDeploy: ${{ needs.get-image-tag.outputs.image-tag }}
+          acrName: schoollawregistry
+          containerAppName: flags
+          containerAppEnvironment: ComplianceTheatre2000
+          resourceGroup: SchoolLawyer
+          environmentVariables: FLAGSMITH_ENV=production DATABASE_URL=${{ vars.FLAGSMITH_DATABASE_URL }} REDIS_URL=${{ vars.FLAGSMITH_REDIS_URL }} DJANGO_SECRET_KEY=secretref:flagsmith-django-secret DJANGO_ALLOWED_HOSTS=${{ vars.FLAGSMITH_ALLOWED_HOSTS }} FLAGSMITH_DJANGO_DEBUG=${{ vars.FLAGSMITH_DJANGO_DEBUG }} FLAGSMITH_API_URL=${{ vars.FLAGSMITH_API_URL }} FLAGSMITH_SELF_HOSTED=${{ vars.FLAGSMITH_SELF_HOSTED }} LOG_LEVEL=info

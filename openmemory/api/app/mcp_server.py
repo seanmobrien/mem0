@@ -29,7 +29,7 @@ from dotenv import load_dotenv
 from app.database import SessionLocal
 from app.models import Memory, MemoryState, MemoryStatusHistory, MemoryAccessLog, User
 from app.utils.db import get_user_and_app
-from app.auth import get_user_record
+from app.auth import get_user_record, require_user_role
 import uuid
 import datetime
 from app.utils.permissions import check_memory_access_permissions
@@ -60,7 +60,7 @@ client_name_var: contextvars.ContextVar[str] = contextvars.ContextVar("client_na
 mcp_router = APIRouter(prefix="/mcp")
 
 # Initialize SSE transport
-sse = SseServerTransport("/mcp/messages/")
+sse = SseServerTransport("/mcp/messages")
 
 @mcp.tool(description="Add a new memory. This method is called everytime the user informs anything about themselves, their preferences, or anything that has any relevant information which can be useful in the future conversation. This can also be called when the user asks you to remember something.  " +
           "Metadata can be provided to store additional information that can be useful for filtering or categorizing memories later.  Any arbitrary metadata can be provided, but some special keys include - 'created_at': when present, this will be used as the memory creation date.  This should always be set to the send date of the analyzed document.  'chat_thread': the thread ID of the chat where this message was sent.")
@@ -354,7 +354,7 @@ async def delete_all_memories() -> str:
         raise MemoryError(f"Error deleting memories: {e}")
 
 
-@mcp_router.get("/{client_name}/sse/{user_id}")
+@mcp_router.get("/{client_name}/sse")
 async def handle_sse(request: Request, client_name: str, user: User = Depends(get_user_record)):
     """Handle SSE connections for a specific user and client.
 
@@ -385,12 +385,19 @@ async def handle_sse(request: Request, client_name: str, user: User = Depends(ge
         client_name_var.reset(client_token)
 
 
-@mcp_router.post("/messages/")
-async def handle_get_message(request: Request):
-    return await handle_post_message(request)
+@mcp_router.post("/messages")
+async def handle_get_message(request: Request, user: User = Depends(get_user_record)):
+    """Handle POST messages for SSE while ensuring user is authenticated.
+    The authenticated user is obtained via `get_user_record`.
+    """
+    uid = user.user_id
+    user_token = user_id_var.set(uid or "")
+    try:
+        return await handle_post_message(request)
+    finally:
+        user_id_var.reset(user_token)
 
-
-@mcp_router.post("/{client_name}/sse/{user_id}/messages/")
+@mcp_router.post("/{client_name}/sse/messages")
 async def handle_post_message_route(request: Request, client_name: str, user: User = Depends(get_user_record)):
     """Handle POST messages for SSE while setting authenticated user context.
 

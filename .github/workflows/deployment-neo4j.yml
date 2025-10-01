@@ -50,4 +50,4 @@ jobs:
           containerAppName: neo4j
           containerAppEnvironment: ComplianceTheatre2000
           resourceGroup: SchoolLawyer
-          environmentVariables: NEO4J_AUTH=secretRef:neo4j-password NEO4J_ACCEPT_LICENSE_AGREEMENT=yes
+          environmentVariables: NEO4J_AUTH=secretref:neo4j-password NEO4J_ACCEPT_LICENSE_AGREEMENT=yes

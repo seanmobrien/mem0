@@ -29,6 +29,7 @@ KEYCLOAK_REALM = os.getenv("KEYCLOAK_REALM", "openmemory")
 KEYCLOAK_CLIENT_ID = os.getenv("KEYCLOAK_CLIENT_ID", "openmemory-api")
 KEYCLOAK_CLIENT_SECRET = os.getenv("KEYCLOAK_CLIENT_SECRET", "")
 ADMIN_ROLE = "memory_admin"
+USER_ROLE = "memory_user"
 
 # Feature flag for authentication (can be disabled for development)
 AUTH_ENABLED = os.getenv("AUTH_ENABLED", "true").lower() in ("true", "1", "yes", "on")
@@ -91,12 +92,14 @@ def verify_token(token: str) -> Dict[str, Any]:
         token_info = keycloak_openid.introspect(token)
         
         if not token_info.get("active", False):
+            logging.error("Received an invalid login token")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Token is not active",
                 headers={"WWW-Authenticate": "Bearer"},
             )
-        if (not has_role(token_info, "memory_user")):
+        if (not has_role(token_info, USER_ROLE)):
+            logging.error("User does not have the required role for memory system access")
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Insufficient permissions",
@@ -201,6 +204,10 @@ def require_role(required_role: str):
 def require_admin():
     return require_role(ADMIN_ROLE)
 
+def require_user_role():
+    return require_role(USER_ROLE)
+
+
 def get_user_id(current_user: Dict[str, Any] = Depends(get_current_user)) -> str:
     """
     Extract user ID from authenticated user
@@ -216,6 +223,7 @@ def get_user_id(current_user: Dict[str, Any] = Depends(get_current_user)) -> str
     
     user_id = current_user.get("sub") or current_user.get("preferred_username")
     if not user_id:
+        logging.error("User ID not found in token")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="User ID not found in token"

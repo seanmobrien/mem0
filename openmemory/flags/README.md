@@ -1,50 +1,56 @@
 # Flagsmith Deployment (Azure Container Apps)
 
-This directory packages a production-ready Flagsmith instance for the OpenMemory platform. The accompanying Dockerfile builds a fully self-hosted environment designed to run inside Azure Container Apps (ACA).
+This directory packages a production-ready Flagsmith instance for the OpenMemory platform. The Dockerfile is now a thin wrapper around the official Flagsmith unified image so you can pin a release and supply Azure Container Apps (ACA) configuration at deploy time.
 
 ## Dockerfile Highlights
 
-- **Pinned release:** Downloads a tagged Flagsmith release archive. Override the version by passing `--build-arg FLAGSMITH_VERSION=x.y.z` during `docker build`.
-- **Two-phase build:** Compiles the React frontend in a dedicated builder stage so the runtime image only serves the prebuilt assets and Python backend.
-- **Azure host defaults:** Sets `DJANGO_ALLOWED_HOSTS` to the ACA hostname (`flags.jollybush-836e15bc.westus3.azurecontainerapps.io`) baked into the image; override at runtime if you expose a different hostname.
-- **Non-root runtime:** Switches to a `flagsmith` system user (`UID 1001`) before launching Gunicorn, aligning with container security best practices.
-- **Health probe:** Provides a `/health/` HTTP endpoint that ACA can monitor using the Dockerfile `HEALTHCHECK`.
+- **Official base image:** Uses `docker.flagsmith.com/flagsmith/flagsmith:${FLAGSMITH_TAG}` for a single image that serves the API, task processor, and dashboard UI.
+- **Configurable tag:** Override the version during `docker build` with `--build-arg FLAGSMITH_TAG=vX.Y.Z` to align with your rollout cadence.
+- **Upstream entrypoint:** Reuses Flagsmith’s default startup script (Gunicorn + migrations helper). Any runtime settings should be provided via environment variables instead of custom build steps.
+- **Health endpoint compatibility:** The upstream image exposes `/health/` and `/healthz/` which can be wired to ACA readiness probes.
 
-## Environment & Backing Services
+## Backing Services & Core Environment Variables
 
-Flagsmith requires PostgreSQL and Redis for production workloads. Configure the following environment variables (and secrets) inside your ACA environment:
+Flagsmith requires PostgreSQL and Redis in production. Provision managed instances for each service and surface the connection details to the container through ACA secrets:
 
-| Variable | Description |
-| --- | --- |
-| `DATABASE_URL` | PostgreSQL connection string (`postgres://user:pass@host:5432/dbname`). |
-| `REDIS_URL` | Redis connection string (`redis://user:pass@host:6379/0`). |
-| `DJANGO_SECRET_KEY` | 50+ character secret for Django cryptographic signing. Store in ACA secrets. |
-| `DJANGO_ALLOWED_HOSTS` | Optional override of the hostname baked into the image. |
-| `FLAGSMITH_DJANGO_DEBUG` | Set to `false` in production. |
-| `FLAGSMITH_API_URL` | Optional external API URL for standalone frontends. |
-| `FLAGSMITH_SELF_HOSTED` | Set to `true` to enable the Flagsmith admin UI for self-hosting. |
-| `AWS_*` | Only required if using S3-compatible storage for uploaded files. |
+| Variable | Required | Purpose |
+| --- | --- | --- |
+| `DATABASE_URL` | ✅ | PostgreSQL connection string (`postgres://user:pass@host:5432/dbname`). |
+| `REDIS_URL` | ✅ | Redis connection string used for asynchronous tasks and caching. |
+| `DJANGO_SECRET_KEY` | ✅ | 50+ character secret for Django cryptographic signing. Store this as an ACA secret. |
+| `DJANGO_ALLOWED_HOSTS` | ✅ | Comma-separated hostnames that should serve the app (e.g. your ACA FQDN + custom domains). |
+| `DJANGO_CSRF_TRUSTED_ORIGINS` | ⚠️ | Required when serving the dashboard over HTTPS on a custom domain. |
+| `FLAGSMITH_DOMAIN` | ⚙️ | Domain used in system generated emails and links. |
+| `ENABLE_TELEMETRY` | ⚙️ | Set to `false` to opt out of anonymous self-host telemetry. Defaults to `true`. |
 
-After the container starts for the first time, run Django migrations to initialize the schema:
+The Flagsmith documentation maintains an exhaustive list of optional settings (application behaviour, email, security, caching, integrations, etc.). Review the following sections and mirror any required values as ACA secrets:
+
+- [Deployment → Hosting → API → Environment Variables](https://docs.flagsmith.com/deployment/hosting/locally-api#environment-variables)
+- [Deployment → Hosting → Frontend](https://docs.flagsmith.com/deployment/hosting/locally-frontend) (UI-specific overrides)
+- [Deployment → Configuration](https://docs.flagsmith.com/deployment/configuration/) (advanced tuning and enterprise features)
+
+## Database Migrations & Static Assets
+
+Run migrations whenever the container image is upgraded. The upstream image includes Django tooling, so you can execute the following as an ACA job or a one-shot container using the same environment variables as the main workload:
 
 ```sh
-# Example: run once as an ACA job or init container
 python manage.py migrate --noinput
 python manage.py collectstatic --noinput
 ```
 
-Ensure the job uses the same environment variables and secrets as the main container so it can connect to PostgreSQL and Redis.
+For larger installations, schedule these commands as part of your deployment pipeline to ensure the database schema stays in sync before traffic reaches new replicas.
 
 ## Azure Container Apps Guidance
 
 - **Container port:** The image exposes port `8000`; configure ACA ingress to forward external traffic to `8000`.
-- **Scale profile:** Start with `minReplicas=1`, `maxReplicas=3`, `cpu=70%` utilization target, and allocate at least `2 GiB` memory per replica.
-- **Secrets management:** Store database, cache, and Django secrets using ACA Secrets and reference them as environment variables.
-- **Ingress:** Enable external ingress, bind the custom hostname, and provision a managed TLS certificate.
-- **Startup command:** Leave the Dockerfile entrypoint as-is; ACA will execute Gunicorn via `/app/entrypoint.sh`.
+- **Scale profile:** Start with `minReplicas=1`, `maxReplicas=3`, `cpuUtilization=70`, and allocate at least `2 GiB` memory per replica.
+- **Secrets management:** Store Postgres, Redis, and Django secrets using ACA Secrets and map them to the environment variables above.
+- **Ingress:** Enable external ingress, bind custom hostnames, and provision managed TLS certificates.
+- **Startup command:** Leave the Dockerfile entrypoint untouched. ACA will run the upstream Flagsmith entrypoint so migrations and Gunicorn start automatically.
 
 ## Additional Tips
 
-- Monitor ACA logs (`az containerapp logs show`) for Django startup output and migration status.
-- For background jobs (e.g., syncing segments), consider using ACA jobs or Azure Functions hitting the Flagsmith API.
-- If you need to tweak static asset handling, update the builder stage to adjust the `frontend` build or the `entrypoint.sh` script copied from Flagsmith upstream.
+- Monitor ACA logs (`az containerapp logs show`) for Django startup output, telemetry notices, and migration status.
+- Flagsmith exposes `/health/` (application) and `/healthz/` (infrastructure) endpoints; wire them to ACA probes for faster failure detection.
+- For background jobs (e.g. segment exports) reuse ACA jobs or Functions that call the Flagsmith API using service accounts configured in the same environment.
+- If you need to enable email flows, configure the appropriate `EMAIL_*` variables documented upstream and verify that the `django_site` table contains your external domain.

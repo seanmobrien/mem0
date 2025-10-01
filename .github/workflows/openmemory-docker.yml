@@ -31,6 +31,7 @@ env:
   SRV_IMAGE_NAME: openmemory-mem0
   KEYCLOAK_IMAGE_NAME: openmemory-keycloak
   NEO4J_IMAGE_NAME: openmemory-neo4j
+  FLAGS_IMAGE_NAME: openmemory-flags
 
 jobs:
   # Check which services have been changed in this push.
@@ -44,6 +45,7 @@ jobs:
       ui_changed: ${{ steps.filter.outputs.ui }}
       keycloak_changed: ${{ steps.filter.outputs.keycloak }}
       neo4j_changed: ${{ steps.filter.outputs.neo4j }}
+      flags_changed: ${{ steps.filter.outputs.flags }}
     steps:
       - uses: actions/checkout@v4
       - id: filter
@@ -68,6 +70,10 @@ jobs:
               - '.github/workflows/deployment-*.yml'
             neo4j:
               - 'openmemory/neo4j/**'
+              - '.github/workflows/openmemory-docker.yml'
+              - '.github/workflows/deployment-*.yml'
+            flags:
+              - 'openmemory/flags/**'
               - '.github/workflows/openmemory-docker.yml'
               - '.github/workflows/deployment-*.yml'
 
@@ -96,6 +102,9 @@ jobs:
           if [[ "${{ needs.check_changes.outputs.neo4j_changed }}" == 'true' ]]; then
             matrix+='{"service":"neo4j","dockerfile":"openmemory/neo4j/Dockerfile","context":"openmemory/neo4j","image":"openmemory-neo4j"},'
           fi
+          if [[ "${{ needs.check_changes.outputs.flags_changed }}" == 'true' ]]; then
+            matrix+='{"service":"flags","dockerfile":"openmemory/flags/Dockerfile","context":"openmemory/flags","image":"openmemory-flags"},'
+          fi
           matrix="${matrix%,}]"
           echo "matrix=$matrix" >> $GITHUB_OUTPUT
           if [[ "$matrix" == '[]' ]]; then
@@ -112,6 +121,7 @@ jobs:
           matrix+='{"service":"ui","dockerfile":"openmemory/ui/Dockerfile","context":"openmemory/ui","image":"openmemory-ui"},'
           matrix+='{"service":"keycloak","dockerfile":"openmemory/keycloak/Dockerfile","context":"openmemory/keycloak","image":"openmemory-keycloak"},'
           matrix+='{"service":"neo4j","dockerfile":"openmemory/neo4j/Dockerfile","context":"openmemory/neo4j","image":"openmemory-neo4j"},'
+          matrix+='{"service":"flags","dockerfile":"openmemory/flags/Dockerfile","context":"openmemory/flags","image":"openmemory-flags"},'
           matrix="${matrix%,}]"
           echo "matrix=$matrix" >> $GITHUB_OUTPUT
           echo "any_changed=true" >> $GITHUB_OUTPUT

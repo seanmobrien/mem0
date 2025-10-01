@@ -9,6 +9,7 @@ from app.database import get_db
 from app.models import User, App, Memory, MemoryAccessLog, MemoryState
 from app.auth import get_current_user, get_user_id, get_user_record, require_admin
 
+DEFAULT_USER_ID="beae98e4-fda0-4531-9119-889ffcb469fe"
 router = APIRouter(prefix="/api/v1/users", tags=["users"])
 
 # Helper functions
@@ -53,7 +54,7 @@ async def get_user_details(
     apps = db.query(App).filter(App.owner_id == user.id).options(joinedload(App.memories)).all()
     return {
         "is_active": user.is_active,
-        "total_memories_created": user.memories.count(),
+        "total_memories_created": user.memories.count(user.memories),
         "name": user.name,
         "description": user.description,
         "created_at": user.created_at,
@@ -136,3 +137,28 @@ async def edit_user(
     db.refresh(user)
 
     return {"status": "success", "message": "User updated successfully", "id": user.id, "data": user}
+
+
+
+@router.delete("/{user_id}")
+async def delete_user(
+    user_id: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_user_record)
+):
+    if not user_id == user.user_id:
+        require_admin()
+    if not user_id:
+        raise HTTPException(status_code=400, detail="User ID cannot be empty")    
+    user = db.query(User).filter(User.user_id == user_id).first()
+
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    for app in user.apps:
+        db.delete(app)
+    db.commit()
+    
+    db.delete(user)
+    db.commit()
+    return {"status": "success", "message": "User deleted successfully"}

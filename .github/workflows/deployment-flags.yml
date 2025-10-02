@@ -49,4 +49,4 @@ jobs:
           containerAppName: flags
           containerAppEnvironment: ComplianceTheatre2000
           resourceGroup: SchoolLawyer
-          environmentVariables: SECRETS_DB_URL=secretref:database-url SECRET_REDIS_URL=secretref:redis-url SECRET_FLAGSMITH_KEY=secretref:django-secret-key APPLICATION_INSIGHTS_CONNECTION_STRING=secretref:app-insights ALLOWED_HOSTS="flags.jollybush-836e15bc.westus3.azurecontainerapps.io" LOG_LVL=DEBUG SECRET_FLAGSMITH_ON_FLAGSMITH_API_KEY=secretref:flagsmith-on-flagsmith
+          environmentVariables: ACCESS_LOG_LOCATION= DATABASE_URL=secretref:database-url CACHE_ENVIRONMENT_DOCUMENT_LOCATION=secretref:redis-url DJANGO_SECRET_KEY=secretref:django-secret-key APPLICATION_INSIGHTS_CONNECTION_STRING=secretref:app-insights ALLOWED_HOSTS="flags.jollybush-836e15bc.westus3.azurecontainerapps.io" LOG_LEVEL=DEBUG FLAGSMITH_ON_FLAGSMITH_API_KEY=secretref:flagsmith-on-flagsmith

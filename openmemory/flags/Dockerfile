@@ -1,10 +1,15 @@
 ARG FLAGSMITH_TAG=latest
 ARG LOG_LVL=INFO
-ARG LOG_FILE="-"
 ARG ALLOWED_HOSTS="flags.jollybush-836e15bc.westus3.azurecontainerapps.io"
 ARG CSRF_TRUSTED_ORIGINS="login.jollybush-836e15bc.westus3.azurecontainerapps.io,mem0-api.jollybush-836e15bc.westus3.azurecontainerapps.io,mem0-ui.jollybush-836e15bc.westus3.azurecontainerapps.io,web-ui.jollybush-836e15bc.westus3.azurecontainerapps.io"
 
 FROM docker.flagsmith.com/flagsmith/flagsmith:${FLAGSMITH_TAG}
+
+ARG FLAGSMITH_TAG=${FLAGSMITH_TAG}
+ARG LOG_LVL=${LOG_LVL}
+ARG ALLOWED_HOSTS=${ALLOWED_HOSTS}
+ARG CSRF_TRUSTED_ORIGINS=${CSRF_TRUSTED_ORIGINS}
+
 
 # This image contains the full Flagsmith stack (API + frontend) and is maintained by
 # the Flagsmith team. Customize runtime configuration exclusively through environment

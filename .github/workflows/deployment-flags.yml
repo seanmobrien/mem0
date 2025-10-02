@@ -49,4 +49,4 @@ jobs:
           containerAppName: flags
           containerAppEnvironment: ComplianceTheatre2000
           resourceGroup: SchoolLawyer
-          environmentVariables: FLAGSMITH_ENV=production DATABASE_URL=${{ vars.FLAGSMITH_DATABASE_URL }} REDIS_URL=${{ vars.FLAGSMITH_REDIS_URL }} DJANGO_SECRET_KEY=secretref:flagsmith-django-secret DJANGO_ALLOWED_HOSTS=${{ vars.FLAGSMITH_ALLOWED_HOSTS }} FLAGSMITH_DJANGO_DEBUG=${{ vars.FLAGSMITH_DJANGO_DEBUG }} FLAGSMITH_API_URL=${{ vars.FLAGSMITH_API_URL }} FLAGSMITH_SELF_HOSTED=${{ vars.FLAGSMITH_SELF_HOSTED }} LOG_LEVEL=info
+          environmentVariables: SECRETS_DB_URL=secretref:database-url SECRET_REDIS_URL=secretref:redis-url SECRET_FLAGSMITH_KEY=secretref:django-secret-key APPLICATION_INSIGHTS_CONNECTION_STRING=secretref:app-insights ALLOWED_HOSTS="flags.jollybush-836e15bc.westus3.azurecontainerapps.io" LOG_LVL=DEBUG SECRET_FLAGSMITH_ON_FLAGSMITH_API_KEY=secretref:flagsmith-on-flagsmith

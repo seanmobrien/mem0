@@ -54,7 +54,6 @@ jobs:
             CACHE_ENVIRONMENT_DOCUMENT_LOCATION=secretref:redis-url
             DJANGO_SECRET_KEY=secretref:django-secret-key
             APPLICATION_INSIGHTS_CONNECTION_STRING=secretref:app-insights
-            ALLOWED_HOSTS="${{ vars.FLAGSMITH_HOST }}"
             LOG_LEVEL="${{ vars.FLAGSMITH_LOG_LEVEL }}"
             FLAGSMITH_ON_FLAGSMITH_API_KEY=secretref:flagsmith-on-flagsmith
             DJANGO_ALLOWED_HOSTS="${{ vars.FLAGSMITH_HOST }}"

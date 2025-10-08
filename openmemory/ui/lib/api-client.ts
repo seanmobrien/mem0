@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { getSession } from 'next-auth/react';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8765';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://mem0-api.jollybush-836e15bc.westus3.azurecontainerapps.io';
 
 // Create an axios instance
 const apiClient = axios.create({

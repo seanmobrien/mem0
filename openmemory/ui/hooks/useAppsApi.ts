@@ -82,7 +82,7 @@ export const useAppsApi = (): UseAppsApiReturn => {
   const dispatch = useDispatch<AppDispatch>();
   const user_id = useSelector((state: RootState) => state.profile.userId);
 
-  const URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8765';
+  const URL = process.env.NEXT_PUBLIC_API_URL || 'https://mem0-api.jollybush-836e15bc.westus3.azurecontainerapps.io';
 
   const fetchApps = useCallback(
     async (

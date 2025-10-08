@@ -46,12 +46,12 @@ export const Install = () => {
   const [copiedTab, setCopiedTab] = useState<string | null>(null);
   const user = process.env.NEXT_PUBLIC_USER_ID || "user";
 
-  const URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8765";
+  const URL = process.env.NEXT_PUBLIC_API_URL || "https://mem0-api.jollybush-836e15bc.westus3.azurecontainerapps.io";
 
   const handleCopy = async (tab: string, isMcp: boolean = false) => {
     const text = isMcp
-      ? `${URL}/mcp/openmemory/sse/${user}`
-      : `npx install-mcp i ${URL}/mcp/${tab}/sse/${user} --client ${tab}`;
+      ? `${URL}/mcp/openmemory/sse`
+      : `npx install-mcp i ${URL}/mcp/${tab}/sse --client ${tab}`;
 
     try {
       // Try using the Clipboard API first

@@ -117,7 +117,7 @@ export const useMemoriesApi = (): UseMemoriesApiReturn => {
     (state: RootState) => state.memories.selectedMemory
   );
 
-  const URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8765';
+  const URL = process.env.NEXT_PUBLIC_API_URL || 'https://mem0-api.jollybush-836e15bc.westus3.azurecontainerapps.io';
 
   const fetchMemories = useCallback(
     async (

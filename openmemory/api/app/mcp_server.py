@@ -63,7 +63,7 @@ mcp_router = APIRouter(prefix="/mcp")
 sse = SseServerTransport("/mcp/messages")
 
 @mcp.tool(description="Add a new memory. This method is called everytime the user informs anything about themselves, their preferences, or anything that has any relevant information which can be useful in the future conversation. This can also be called when the user asks you to remember something.  " +
-          "Metadata can be provided to store additional information that can be useful for filtering or categorizing memories later.  Any arbitrary metadata can be provided, but some special keys include - 'created_at': when present, this will be used as the memory creation date.  This should always be set to the send date of the analyzed document.  'chat_thread': the thread ID of the chat where this message was sent.")
+          "Metadata can be provided to store additional information that can be useful for filtering or categorizing memories later.  Any arbitrary metadata can be provided, but some special keys include:\n - 'document_id': The case file or document to associate with a memory.  Always provide this if available.\n - 'created_at': when present, this will be used as the memory creation date.  This should always be set to the send date of the analyzed document. - 'chat_thread': the thread ID of the chat where this message was sent.")
 async def add_memories(text: str, metadata: Mapping[str, Any] = None) -> str | Mapping[str, str | List[Any] | Mapping[str, Any]]:
     if metadata is None:
         metadata = {}
@@ -232,8 +232,8 @@ async def list_memories() -> str:
             filtered_memories = []
 
             # Filter memories based on permissions
-            user_memories = db.query(Memory).filter(Memory.user_id == user.id).all()
-            accessible_memory_ids = [memory.id for memory in user_memories if check_memory_access_permissions(db, memory, app.id)]
+            user_memories = db.query(Memory).filter(Memory.user_id == uuid.UUID(user.user_id)).all()
+            accessible_memory_ids = [memory.id for memory in user_memories if check_memory_access_permissions(db, memory, user, app.id)]
             if isinstance(memories, dict) and 'results' in memories:
                 for memory_data in memories['results']:
                     if 'id' in memory_data:
@@ -255,7 +255,7 @@ async def list_memories() -> str:
                 for memory in memories:
                     memory_id = uuid.UUID(memory['id'])
                     memory_obj = db.query(Memory).filter(Memory.id == memory_id).first()
-                    if memory_obj and check_memory_access_permissions(db, memory_obj, app.id):
+                    if memory_obj and check_memory_access_permissions(db, memory_obj, user, app.id):
                         # Create access log entry
                         access_log = MemoryAccessLog(
                             memory_id=memory_id,
@@ -303,8 +303,8 @@ async def delete_all_memories() -> str:
             # Get or create user and app
             user, app = get_user_and_app(db, user_id=uid, app_id=client_name)
 
-            user_memories = db.query(Memory).filter(Memory.user_id == user.id).all()
-            accessible_memory_ids = [memory.id for memory in user_memories if check_memory_access_permissions(db, memory, app.id)]
+            user_memories = db.query(Memory).filter(Memory.user_id == uuid.UUID(user.user_id)).all()
+            accessible_memory_ids = [memory.id for memory in user_memories if check_memory_access_permissions(db, memory, user, app.id)]
 
             # delete the accessible memories only
             for memory_id in accessible_memory_ids:

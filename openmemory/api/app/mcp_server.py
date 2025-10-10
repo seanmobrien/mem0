@@ -233,7 +233,7 @@ async def list_memories() -> str:
 
             # Filter memories based on permissions
             user_memories = db.query(Memory).filter(Memory.user_id == user.id).all()
-            accessible_memory_ids = [memory.id for memory in user_memories if check_memory_access_permissions(db, memory, app.id)]
+            accessible_memory_ids = [memory.id for memory in user_memories if check_memory_access_permissions(db, memory, user, app.id)]
             if isinstance(memories, dict) and 'results' in memories:
                 for memory_data in memories['results']:
                     if 'id' in memory_data:
@@ -255,7 +255,7 @@ async def list_memories() -> str:
                 for memory in memories:
                     memory_id = uuid.UUID(memory['id'])
                     memory_obj = db.query(Memory).filter(Memory.id == memory_id).first()
-                    if memory_obj and check_memory_access_permissions(db, memory_obj, app.id):
+                    if memory_obj and check_memory_access_permissions(db, memory_obj, user, app.id):
                         # Create access log entry
                         access_log = MemoryAccessLog(
                             memory_id=memory_id,
@@ -304,7 +304,7 @@ async def delete_all_memories() -> str:
             user, app = get_user_and_app(db, user_id=uid, app_id=client_name)
 
             user_memories = db.query(Memory).filter(Memory.user_id == user.id).all()
-            accessible_memory_ids = [memory.id for memory in user_memories if check_memory_access_permissions(db, memory, app.id)]
+            accessible_memory_ids = [memory.id for memory in user_memories if check_memory_access_permissions(db, memory, user, app.id)]
 
             # delete the accessible memories only
             for memory_id in accessible_memory_ids:

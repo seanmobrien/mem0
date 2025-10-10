@@ -67,7 +67,7 @@ async def search_memories(
 
             # Get accessible memory IDs based on ACL
             user_memories = db.query(Memory).filter(Memory.user_id == user.id).all()
-            accessible_memory_ids = [memory.id for memory in user_memories if check_memory_access_permissions(db, memory, app.id)]
+            accessible_memory_ids = [memory.id for memory in user_memories if check_memory_access_permissions(db, memory, user, app.id)]
             
             # Build baseline conditions
             conditions = [qdrant_models.FieldCondition(key="user_id", match=qdrant_models.MatchValue(value=user_id))]

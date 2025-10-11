@@ -288,12 +288,13 @@ You are a memory summarization system that records and preserves the complete in
 """
 
 
-def get_update_memory_messages(retrieved_old_memory_dict, response_content, custom_update_memory_prompt=None):
-    if custom_update_memory_prompt is None:
-        global DEFAULT_UPDATE_MEMORY_PROMPT
-        custom_update_memory_prompt = DEFAULT_UPDATE_MEMORY_PROMPT
+def get_update_memory_messages(retrieved_old_memory_dict, response_content, custom_update_memory_prompt=None):    
+    if custom_update_memory_prompt is None or custom_update_memory_prompt.strip() == "":
+        update_mem_prompt = DEFAULT_UPDATE_MEMORY_PROMPT
+    else:
+        update_mem_prompt = "\n".join([DEFAULT_UPDATE_MEMORY_PROMPT, custom_update_memory_prompt])
 
-    return f"""{custom_update_memory_prompt}
+    return f"""{update_mem_prompt}
 
     Below is the current content of my memory which I have collected till now. You have to update it in the following format only:
 

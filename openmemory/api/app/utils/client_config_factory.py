@@ -211,6 +211,7 @@ def get_default_memory_config(expandSecrets: bool = True) -> dict:
     vectorProvider = parse_environment_variable_value("env:MEM0_PROVIDER_VECTORSTORE")
     graphProvider = parse_environment_variable_value("env:MEM0_PROVIDER_GRAPHSTORE")
     customExtractionPrompt = parse_environment_variable_value("env:MEM0_EXTRACTION_PROMPT", None, expandSecrets)
+    customUpdateMemoryPrompt = parse_environment_variable_value("env:MEM0_UPDATE_MEMORY_PROMPT", None, expandSecrets)
 
     defaultValues: dict = {
         "llm": {
@@ -287,9 +288,11 @@ def get_default_memory_config(expandSecrets: bool = True) -> dict:
             }
         }
 
-    # Custom Fact Extraction Prompt
+    # Custom Fact Extraction and update prompts
     if customExtractionPrompt is not None:
         defaultValues["custom_fact_extraction_prompt"] = parse_environment_variable_value(customExtractionPrompt, expandSecrets = expandSecrets)
+    if customUpdateMemoryPrompt is not None:
+        defaultValues["custom_update_memory_prompt"] = parse_environment_variable_value(customUpdateMemoryPrompt, expandSecrets = expandSecrets)
 
     return defaultValues    
 
@@ -347,11 +350,17 @@ def get_parsed_memory_config(custom_instructions: str | None = None, expandSecre
         json_config = _get_config_from_database()
 
         if json_config:                    
-            # Extract custom instructions from openmemory settings
-            if "openmemory" in json_config and "custom_instructions" in json_config["openmemory"] and custom_instructions is None:
-                config["custom_fact_extraction_prompt"] = json_config["openmemory"]["custom_instructions"]
-            
             # Override defaults with configurations from the database
+            
+            if "openmemory" in json_config:
+                if "custom_fact_extraction_prompt" in json_config["openmemory"]:
+                    config["custom_fact_extraction_prompt"] = json_config["openmemory"]["custom_fact_extraction_prompt"]
+                if "custom_update_memory_prompt" in json_config["openmemory"]:
+                    config["custom_update_memory_prompt"] = json_config["openmemory"]["custom_update_memory_prompt"]
+                # Legacy support
+                if "custom_instructions" in json_config["openmemory"] and config["custom_fact_extraction_prompt"] is None:                    
+                    config["custom_fact_extraction_prompt"] = json_config["openmemory"]["custom_instructions"]            
+
             if "mem0" in json_config:
                 mem0_config = json_config["mem0"]                
                 # Update configuration sections where available
@@ -389,9 +398,12 @@ def split_config(config: dict):
     Returns a dictionary with 'openmemory' and 'mem0' keys.
     """
     ret: dict[str, dict] = {}    
-    custom_instructions = config.pop("custom_fact_extraction_prompt", None)
-
-    ret["openmemory"] = dict([["custom_instructions", custom_instructions]])
+    # custom_instructions = config.pop("custom_fact_extraction_prompt", None)
+    ret["openmemory"] = dict([
+        ["custom_fact_extraction_prompt", config.get("custom_fact_extraction_prompt", None)],
+        ["custom_update_memory_prompt", config.get("custom_update_memory_prompt", None)]
+        # ["custom_instructions", config.get("custom_fact_extraction_prompt", None)],
+    ])
     ret["mem0"] = dict([["llm", config.get("llm", {})],
                         ["embedder", config.get("embedder", {})],
                         ["vector_store", config.get("vector_store", {})],

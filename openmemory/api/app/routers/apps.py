@@ -1,6 +1,7 @@
 from typing import Optional
 import datetime
 from uuid import UUID
+from functools import wraps
 from fastapi import APIRouter, Depends, HTTPException, Query
 import sqlalchemy
 from sqlalchemy.orm import Session, joinedload
@@ -9,8 +10,33 @@ from sqlalchemy import func, desc, sql
 from app.database import get_db
 from app.models import User, App, Memory, MemoryAccessLog, MemoryState
 from app.auth import get_current_user, get_user_record
+from opentelemetry import trace
+from opentelemetry.trace import SpanKind, Status, StatusCode
 
 router = APIRouter(prefix="/api/v1/apps", tags=["apps"])
+
+_TRACER = trace.get_tracer("mem0.api.apps")
+
+
+def _record_exception(span, exc: Exception) -> None:
+    span.record_exception(exc)
+    span.set_status(Status(StatusCode.ERROR, str(exc)))
+
+
+def traced_endpoint(span_name: str):
+    def decorator(func):
+        @wraps(func)
+        async def wrapper(*args, **kwargs):
+            with _TRACER.start_as_current_span(span_name, kind=SpanKind.SERVER) as span:
+                try:
+                    return await func(*args, **kwargs)
+                except Exception as exc:
+                    _record_exception(span, exc)
+                    raise
+
+        return wrapper
+
+    return decorator
 
 # Helper functions
 def get_app_or_404(db: Session, app_id: UUID) -> App:
@@ -21,6 +47,7 @@ def get_app_or_404(db: Session, app_id: UUID) -> App:
 
 # List all apps with filtering
 @router.get("/")
+@traced_endpoint("apps.list")
 async def list_apps(
     name: Optional[str] = None,
     is_active: Optional[bool] = None,
@@ -30,6 +57,12 @@ async def list_apps(
     page_size: int = Query(10, ge=1, le=100),
     db: Session = Depends(get_db)
 ):
+    span = trace.get_current_span()
+    if name:
+        span.set_attribute("mem0.app_name_query", name)
+    span.set_attribute("mem0.is_active_filter", is_active if is_active is not None else "any")
+    span.set_attribute("mem0.page", page)
+    span.set_attribute("mem0.page_size", page_size)
     # Create a subquery for memory counts
     memory_counts = db.query(
         Memory.app_id,
@@ -102,10 +135,13 @@ async def list_apps(
 
 # Get app details
 @router.get("/{app_id}")
+@traced_endpoint("apps.details")
 async def get_app_details(
     app_id: UUID,
     db: Session = Depends(get_db)
 ) -> dict:
+    span = trace.get_current_span()
+    span.set_attribute("mem0.app_id", str(app_id))
     app = get_app_or_404(db, app_id)
 
     # Get memory access statistics
@@ -127,12 +163,17 @@ async def get_app_details(
 
 # List memories created by app
 @router.get("/{app_id}/memories")
+@traced_endpoint("apps.memories")
 async def list_app_memories(
     app_id: UUID,
     page: int = Query(1, ge=1),
     page_size: int = Query(10, ge=1, le=100),
     db: Session = Depends(get_db)
 ):
+    span = trace.get_current_span()
+    span.set_attribute("mem0.app_id", str(app_id))
+    span.set_attribute("mem0.page", page)
+    span.set_attribute("mem0.page_size", page_size)
     get_app_or_404(db, app_id)
     query = db.query(Memory).filter(
         Memory.app_id == app_id,
@@ -163,12 +204,17 @@ async def list_app_memories(
 
 # List memories accessed by app
 @router.get("/{app_id}/accessed")
+@traced_endpoint("apps.accessed")
 async def list_app_accessed_memories(
     app_id: UUID,
     page: int = Query(1, ge=1),
     page_size: int = Query(10, ge=1, le=100),
     db: Session = Depends(get_db)
 ):
+    span = trace.get_current_span()
+    span.set_attribute("mem0.app_id", str(app_id))
+    span.set_attribute("mem0.page", page)
+    span.set_attribute("mem0.page_size", page_size)
     
     # Get memories with access counts
     query = db.query(
@@ -215,6 +261,7 @@ async def list_app_accessed_memories(
 
 
 @router.put("/{app_id}")
+@traced_endpoint("apps.update")
 async def update_app_details(
     app_id: UUID,
     is_active: bool,
@@ -222,6 +269,9 @@ async def update_app_details(
     metadata: Optional[dict] = None,
     db: Session = Depends(get_db)
 ):
+    span = trace.get_current_span()
+    span.set_attribute("mem0.app_id", str(app_id))
+    span.set_attribute("mem0.is_active", is_active)
     app = get_app_or_404(db, app_id)
     app.is_active = is_active # type: ignore
     if (description is not None):
@@ -236,6 +286,7 @@ async def update_app_details(
     return {"status": "success", "message": "Updated app details successfully"}
 
 @router.post("/")
+@traced_endpoint("apps.create")
 async def create_app(
     name: str,
     description: Optional[str] = None,
@@ -244,6 +295,10 @@ async def create_app(
     db: Session = Depends(get_db),
     user: User = Depends(get_user_record)
 ):
+    span = trace.get_current_span()
+    span.set_attribute("mem0.user_id", user.user_id)
+    span.set_attribute("mem0.app_name", name)
+    span.set_attribute("mem0.is_active", is_active)
     # Validate input
     if not name:
         raise HTTPException(status_code=400, detail="App name cannot be empty")

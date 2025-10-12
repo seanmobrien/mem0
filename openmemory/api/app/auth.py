@@ -31,8 +31,8 @@ KEYCLOAK_CLIENT_SECRET = os.getenv("KEYCLOAK_CLIENT_SECRET", "")
 ADMIN_ROLE = "memory_admin"
 USER_ROLE = "memory_user"
 
-# Feature flag for authentication (can be disabled for development)
-AUTH_ENABLED = os.getenv("AUTH_ENABLED", "true").lower() in ("true", "1", "yes", "on")
+# Feature flag for authentication - it must be explicitly disabled to bypass
+AUTH_ENABLED = not os.getenv("AUTH_ENABLED", "true").lower() in ("false", "0", "no", "off")
 
 # Cache for Keycloak configuration
 _keycloak_openid: Optional[KeycloakOpenID] = None

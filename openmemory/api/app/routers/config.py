@@ -39,8 +39,10 @@ class EmbedderProvider(BaseModel):
     provider: str = Field(..., description="Embedder provider name")
     config: EmbedderConfig = Field(..., description="Configuration for the embedder provider")
 
-class OpenMemoryConfig(BaseModel):
-    custom_instructions: Optional[str] = Field(..., description="Custom instructions for memory management and fact extraction")
+class OpenMemoryConfig(BaseModel):    
+    custom_instructions: Optional[str] = None
+    custom_fact_extraction_prompt: Optional[str] = None
+    custom_update_memory_prompt: Optional[str] = None
 
 class VectorStoreConfig(BaseModel):
     provider: str = Field(..., description="Vector store provider name")

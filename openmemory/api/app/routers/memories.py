@@ -159,7 +159,7 @@ async def list_memories(
     # Filter results based on permissions
     filtered_items = []
     for item in paginated_results.items:
-        if check_memory_access_permissions(db, item, app_id):
+        if check_memory_access_permissions(db, item, user):
             filtered_items.append(item)
 
     # Update paginated results with filtered items

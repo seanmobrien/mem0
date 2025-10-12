@@ -49,17 +49,4 @@ jobs:
           containerAppName: flags
           containerAppEnvironment: ComplianceTheatre2000
           resourceGroup: SchoolLawyer
-          environmentVariables: |
-            DATABASE_URL=secretref:database-url
-            CACHE_ENVIRONMENT_DOCUMENT_LOCATION=secretref:redis-url
-            DJANGO_SECRET_KEY=secretref:django-secret-key
-            APPLICATION_INSIGHTS_CONNECTION_STRING=secretref:app-insights
-            LOG_LEVEL="${{ vars.FLAGSMITH_LOG_LEVEL }}"
-            FLAGSMITH_ON_FLAGSMITH_API_KEY=secretref:flagsmith-on-flagsmith
-            DJANGO_ALLOWED_HOSTS="${{ vars.FLAGSMITH_HOST }}"
-            USE_X_FORWARDED_HOST="${{ vars.FLAGSMITH_USE_X_FORWARDED_HOST }}"
-            FLAGSMITH_API_URL="https://${{ vars.FLAGSMITH_HOST }}/api/v1"
-            API_URL="https://${{ vars.FLAGSMITH_HOST }}/api/v1"
-            ENVIRONMENT="${{ vars.FLAGSMITH_ENVIRONMENT }}"
-            FLAGSMITH_DOMAIN="https://${{ vars.FLAGSMITH_HOST }}"
-            FLAGSMITH_ON_FLAGSMITH_API_URL="https://${{ vars.FLAGSMITH_HOST }}/api/v1"
+          environmentVariables: DATABASE_URL=secretref:database-url CACHE_ENVIRONMENT_DOCUMENT_LOCATION=secretref:redis-url DJANGO_SECRET_KEY=secretref:django-secret-key APPLICATION_INSIGHTS_CONNECTION_STRING=secretref:app-insights LOG_LEVEL="${{ vars.FLAGSMITH_LOG_LEVEL }}" FLAGSMITH_ON_FLAGSMITH_API_KEY=secretref:flagsmith-on-flagsmith DJANGO_ALLOWED_HOSTS="${{ vars.FLAGSMITH_HOST }}" USE_X_FORWARDED_HOST="${{ vars.FLAGSMITH_USE_X_FORWARDED_HOST }}" FLAGSMITH_API_URL="https://${{ vars.FLAGSMITH_HOST }}/api/v1" API_URL="https://${{ vars.FLAGSMITH_HOST }}/api/v1" ENVIRONMENT="${{ vars.FLAGSMITH_ENVIRONMENT }}" FLAGSMITH_DOMAIN="https://${{ vars.FLAGSMITH_HOST }}" FLAGSMITH_ON_FLAGSMITH_API_URL="https://${{ vars.FLAGSMITH_HOST }}/api/v1"

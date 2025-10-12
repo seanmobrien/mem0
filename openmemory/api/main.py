@@ -9,8 +9,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.models import User, App
 from uuid import uuid4
 from app.config import USER_ID, DEFAULT_APP_ID
+from app.telemetry import init_telemetry
 
 publicUrl = os.getenv("NEXT_PUBLIC_URL") or "http://localhost:8000"
+_telemetry_connection_string = os.getenv("AZURE_MONITOR_CONNECTION_STRING", "")
+_telemetry_sampling_ratio = os.getenv("AZURE_MONITOR_SAMPLING_RATIO")
+
+telemetry_tracer = init_telemetry(
+    _telemetry_connection_string,
+    float(_telemetry_sampling_ratio) if _telemetry_sampling_ratio else None,
+)
 
 app = FastAPI(
     title="OpenMemory API", 
@@ -18,6 +26,10 @@ app = FastAPI(
     root_path_in_servers=False,
     description="OpenMemory API with Keycloak authentication"
 )
+
+if telemetry_tracer:
+    # Expose tracer for reuse by application components that need custom spans.
+    app.state.telemetry_tracer = telemetry_tracer
 
 app.add_middleware(
     CORSMiddleware,

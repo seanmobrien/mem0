@@ -7,7 +7,6 @@ import os
 import socket
 from typing import Optional
 
-from azure.monitor.opentelemetry import configure_azure_monitor
 from opentelemetry import trace
 from opentelemetry.trace import Tracer
 from opentelemetry.sdk.resources import Resource
@@ -69,8 +68,15 @@ def init_telemetry(connection_string: str, sampling_ratio: Optional[float] = Non
                 record.levelname = "DEBUG"
             return True
 
-    logger = logging.getLogger("azure.monitor.opentelemetry._configure")
-    logger.addFilter(_DowngradeExceptionFilter())
+    try:
+        # Import inside runtime so a missing pkg_resources won't break module import
+        from azure.monitor.opentelemetry import configure_azure_monitor
+
+        logger = logging.getLogger("azure.monitor.opentelemetry._configure")
+        logger.addFilter(_DowngradeExceptionFilter())
+    except Exception as exc:  # pragma: no cover - defensive
+        logging.getLogger(__name__).warning("Azure telemetry package not available: %s", exc)
+        return trace.get_tracer(__name__)
 
     class _SuppressTransmissionLogs(logging.Filter):
         _MESSAGE_PREFIX = "Transmission succeeded:"

@@ -29,6 +29,22 @@ def traced_endpoint(span_name: str):
         async def wrapper(*args, **kwargs):
             with _TRACER.start_as_current_span(span_name, kind=SpanKind.SERVER) as span:
                 try:
+                    # Enrich with request/user/app details when available
+                    user = kwargs.get("user")
+                    if user and hasattr(user, "user_id"):
+                        span.set_attribute("mem0.user_id", getattr(user, "user_id"))
+                    app_id = kwargs.get("app_id") or kwargs.get("app")
+                    if app_id:
+                        span.set_attribute("mem0.app_id", str(app_id))
+                    # attempt to add http method/url if request provided
+                    request = kwargs.get("request")
+                    if request:
+                        try:
+                            span.set_attribute("http.method", request.method)
+                            span.set_attribute("http.target", str(getattr(request, "url", "")))
+                        except Exception:
+                            pass
+
                     return await func(*args, **kwargs)
                 except Exception as exc:
                     _record_exception(span, exc)

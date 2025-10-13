@@ -11,6 +11,43 @@ from mem0.utils.factory import VectorStoreFactory
 import mem0
 from datetime import datetime, timezone
 from app.auth import get_current_user, get_user_record, check_auth_service_health
+from opentelemetry import trace
+from opentelemetry.trace import SpanKind, Status, StatusCode
+
+_TRACER = trace.get_tracer("mem0.api.stats")
+
+
+def _record_exception(span, exc: Exception) -> None:
+    span.record_exception(exc)
+    span.set_status(Status(StatusCode.ERROR, str(exc)))
+
+
+def traced_endpoint(span_name: str):
+    def decorator(func):
+        from functools import wraps
+
+        @wraps(func)
+        async def wrapper(*args, **kwargs):
+            with _TRACER.start_as_current_span(span_name, kind=SpanKind.SERVER) as span:
+                try:
+                    # try to attach user if present
+                    user = kwargs.get("user")
+                    if not user:
+                        for a in args:
+                            if hasattr(a, "user_id"):
+                                user = a
+                                break
+                    if user and hasattr(user, "user_id"):
+                        span.set_attribute("mem0.user_id", getattr(user, "user_id"))
+
+                    return await func(*args, **kwargs)
+                except Exception as exc:
+                    _record_exception(span, exc)
+                    raise
+
+        return wrapper
+
+    return decorator
 
 
 logger = logging.getLogger(__name__)
@@ -18,6 +55,7 @@ router = APIRouter(prefix="/api/v1/stats", tags=["stats"])
 healthcheck_user = "system_healthcheck"
 
 @router.get("/")
+@traced_endpoint("stats.get_profile")
 async def get_profile(
     db: Session = Depends(get_db),
     user: User = Depends(get_user_record)
@@ -29,6 +67,11 @@ async def get_profile(
     # Get total number of apps
     apps = db.query(App).filter(App.owner == user)
     total_apps = apps.count()
+    span = trace.get_current_span()
+    try:
+        span.set_attribute("mem0.user_id", user.user_id)
+    except Exception:
+        pass
 
     return {
         "total_memories": total_memories,

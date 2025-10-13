@@ -8,6 +8,42 @@ from app.database import get_db
 from app.models import Config as ConfigModel
 from app.utils.memory import reset_memory_client
 from app.auth import get_current_user, get_user_record
+from app.auth import require_admin
+from opentelemetry import trace
+from opentelemetry.trace import SpanKind, Status, StatusCode
+
+_TRACER = trace.get_tracer("mem0.api.config")
+
+
+def _record_exception(span, exc: Exception) -> None:
+    span.record_exception(exc)
+    span.set_status(Status(StatusCode.ERROR, str(exc)))
+
+
+def traced_endpoint(span_name: str):
+    def decorator(func):
+        from functools import wraps
+
+        @wraps(func)
+        async def wrapper(*args, **kwargs):
+            with _TRACER.start_as_current_span(span_name, kind=SpanKind.SERVER) as span:
+                try:
+                    user = kwargs.get("user")
+                    if not user:
+                        for a in args:
+                            if hasattr(a, "user_id"):
+                                user = a
+                                break
+                    if user and hasattr(user, "user_id"):
+                        span.set_attribute("mem0.user_id", getattr(user, "user_id"))
+                    return await func(*args, **kwargs)
+                except Exception as exc:
+                    _record_exception(span, exc)
+                    raise
+
+        return wrapper
+
+    return decorator
 
 logger = logging.getLogger(__name__)
 
@@ -123,6 +159,7 @@ def get_saved_memory_config():
         raise HTTPException(status_code=500, detail="Invalid configuration format")    
 
 @router.get("/", response_model=ConfigSchema)
+@traced_endpoint("config.get")
 async def get_configuration(db: Session = Depends(get_db)):
     """Get the current configuration."""
     config = get_saved_memory_config()
@@ -134,7 +171,10 @@ async def get_configuration(db: Session = Depends(get_db)):
     return config
 
 @router.put("/", response_model=ConfigSchema)
-async def update_configuration(config: ConfigSchema, db: Session = Depends(get_db)):
+@traced_endpoint("config.update")
+async def update_configuration(config: ConfigSchema, db: Session = Depends(get_db), user = Depends(get_user_record)):
+    # require admin or owner-level access to update configuration
+    require_admin()
     """Update the configuration."""
     current_config = get_saved_memory_config()
     
@@ -158,7 +198,9 @@ async def update_configuration(config: ConfigSchema, db: Session = Depends(get_d
     return updated_config
 
 @router.post("/reset", response_model=ConfigSchema)
-async def reset_configuration(db: Session = Depends(get_db)):
+@traced_endpoint("config.reset")
+async def reset_configuration(db: Session = Depends(get_db), user = Depends(get_user_record)):
+    require_admin()
     """Reset the configuration to default values."""
     try:
         # Get the default configuration with proper provider setups
@@ -180,7 +222,9 @@ async def get_llm_configuration(db: Session = Depends(get_db)):
     return llm_config
 
 @router.put("/mem0/llm", response_model=LLMProvider)
-async def update_llm_configuration(llm_config: LLMProvider, db: Session = Depends(get_db)):
+@traced_endpoint("config.update_llm")
+async def update_llm_configuration(llm_config: LLMProvider, db: Session = Depends(get_db), user = Depends(get_user_record)):
+    require_admin()
     """Update only the LLM configuration."""
     current_config = get_saved_memory_config()
     
@@ -204,7 +248,9 @@ async def get_embedder_configuration(db: Session = Depends(get_db)):
     return embedder_config    
 
 @router.put("/mem0/embedder", response_model=EmbedderProvider)
-async def update_embedder_configuration(embedder_config: EmbedderProvider, db: Session = Depends(get_db)):
+@traced_endpoint("config.update_embedder")
+async def update_embedder_configuration(embedder_config: EmbedderProvider, db: Session = Depends(get_db), user = Depends(get_user_record)):
+    require_admin()
     """Update only the Embedder configuration."""
     current_config = get_saved_memory_config()
     
@@ -228,7 +274,9 @@ async def get_openmemory_configuration(db: Session = Depends(get_db)):
     return openmemory_config
 
 @router.put("/openmemory", response_model=OpenMemoryConfig)
-async def update_openmemory_configuration(openmemory_config: OpenMemoryConfig, db: Session = Depends(get_db)):
+@traced_endpoint("config.update_openmemory")
+async def update_openmemory_configuration(openmemory_config: OpenMemoryConfig, db: Session = Depends(get_db), user = Depends(get_user_record)):
+    require_admin()
     """Update only the OpenMemory configuration."""
     current_config = get_saved_memory_config()        
     if current_config.openmemory is None:        

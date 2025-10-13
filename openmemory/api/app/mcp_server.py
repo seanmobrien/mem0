@@ -21,7 +21,17 @@ from typing import Any, Dict, List, Mapping, Optional
 from mcp.server.fastmcp import FastMCP, Context
 from opentelemetry import context as otel_context, trace
 from opentelemetry.propagate import extract
-from opentelemetry.trace import SpanKind, Status, StatusCode
+from opentelemetry.trace import (
+    SpanKind,
+    Status,
+    StatusCode,
+    SpanContext,
+    TraceFlags,
+    NonRecordingSpan,
+    set_span_in_context,
+    TraceState,
+)
+import re
 from mcp.server.sse import SseServerTransport
 from app.utils.memory import get_memory_client
 from fastapi import FastAPI, HTTPException, Request, Depends
@@ -65,11 +75,37 @@ _TRACER = trace.get_tracer("mem0.mcp")
 def _attach_trace_context_from_request(request: Request) -> Optional[object]:
     """Attach OpenTelemetry context derived from incoming request headers."""
     try:
+        # Prefer explicit W3C traceparent header parsing so we can set remote parent
+        traceparent = request.headers.get("traceparent")
+        if traceparent:
+            # W3C traceparent format: 00-<trace-id>-<parent-id>-<trace-flags>
+            m = re.match(r"^[ \t]*([0-9a-fA-F]{2})-([0-9a-fA-F]{32})-([0-9a-fA-F]{16})-([0-9a-fA-F]{2})", traceparent)
+            if m:
+                version, trace_id_hex, parent_id_hex, trace_flags_hex = m.groups()
+                trace_id = int(trace_id_hex, 16)
+                span_id = int(parent_id_hex, 16)
+                flags = int(trace_flags_hex, 16)
+
+                # Build a remote SpanContext as parent
+                parent_span_context = SpanContext(
+                    trace_id=trace_id,
+                    span_id=span_id,
+                    is_remote=True,
+                    trace_flags=TraceFlags(flags),
+                    trace_state=TraceState(),
+                )
+                parent_span = NonRecordingSpan(parent_span_context)
+                ctx = set_span_in_context(parent_span)
+                logging.debug("Attached remote parent span: trace_id=%s span_id=%s", trace_id_hex, parent_id_hex)
+                return otel_context.attach(ctx)
+
+        # Fallback to normal propagator extraction
         context = extract(request.headers)
+        logging.debug("Propagator extracted context: %s", bool(context))
+        return otel_context.attach(context)
     except Exception as exc:  # pragma: no cover - defensive logging
         logging.debug("Failed to extract trace context: %s", exc)
         return None
-    return otel_context.attach(context)
 
 
 def _detach_trace_context(token: Optional[object]) -> None:

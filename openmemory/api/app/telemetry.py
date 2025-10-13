@@ -49,8 +49,8 @@ def init_telemetry(connection_string: str, sampling_ratio: Optional[float] = Non
     resource = Resource.create(
         {
             "service.name": "Mem0-Api",
-            "service.instance.id": f"ObApps.ComplianceTheatre-Mem0-Api-{instance_id}",
-            "service.namespace": "mem0-api.jollybush-836e15bc.westus3.azurecontainerapps.io",
+            "service.instance.id": f"ObApps.ComplianceTheatre.Mem0-Api.{instance_id}",
+            "service.namespace": "ObApps.ComplianceTheatre",
             "ai.cloud.roleBaseName": "mem0-api.jollybush-836e15bc.westus3.azurecontainerapps.io",
         }
     )

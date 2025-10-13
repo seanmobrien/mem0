@@ -4,6 +4,7 @@ from uuid import UUID, uuid4
 import logging
 import os
 from functools import wraps
+from fastapi import Request
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, joinedload
 from fastapi_pagination import Page, Params
@@ -41,6 +42,42 @@ def traced_endpoint(span_name: str):
         async def wrapper(*args, **kwargs):
             with _TRACER.start_as_current_span(span_name, kind=SpanKind.SERVER) as span:
                 try:
+                    # Try to enrich span with common attributes from args/kwargs
+                    # user (dependency) is commonly passed as 'user'
+                    user = kwargs.get("user")
+                    if not user:
+                        # search positional args for a user-like object (has user_id)
+                        for a in args:
+                            if hasattr(a, "user_id"):
+                                user = a
+                                break
+                    if user and hasattr(user, "user_id"):
+                        span.set_attribute("mem0.user_id", getattr(user, "user_id"))
+
+                    # app_id or app parameter
+                    app_id = kwargs.get("app_id") or kwargs.get("app") or kwargs.get("request") and None
+                    if not app_id and "request" in kwargs and hasattr(kwargs["request"], "path_params"):
+                        # try to derive from path params
+                        path_params = getattr(kwargs["request"], "path_params", {})
+                        if "app_id" in path_params:
+                            app_id = path_params["app_id"]
+                    if app_id:
+                        span.set_attribute("mem0.app_id", str(app_id))
+
+                    # If Request present, add route details
+                    request = kwargs.get("request")
+                    if not request:
+                        for a in args:
+                            if isinstance(a, Request):
+                                request = a
+                                break
+                    if request:
+                        try:
+                            span.set_attribute("http.method", request.method)
+                            span.set_attribute("http.target", str(getattr(request, "url", "")))
+                        except Exception:
+                            pass
+
                     return await func(*args, **kwargs)
                 except Exception as exc:
                     _record_exception(span, exc)

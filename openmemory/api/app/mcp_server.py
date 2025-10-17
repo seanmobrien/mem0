@@ -15,30 +15,33 @@ Key features:
 - Environment variable parsing for API keys
 """
 
-import logging
-import json
-from typing import Any, Dict, List, Mapping, Optional
-from mcp.server.fastmcp import FastMCP, Context
-from opentelemetry import context as otel_context, trace
-from opentelemetry.propagate import extract
-from opentelemetry.trace import SpanKind, Status, StatusCode
-from mcp.server.sse import SseServerTransport
-from app.utils.memory import get_memory_client
-from fastapi import FastAPI, HTTPException, Request, Depends
-from fastapi.routing import APIRouter
 import contextvars
-import os
-from dotenv import load_dotenv
-from app.database import SessionLocal
-from app.models import Memory, MemoryState, MemoryStatusHistory, MemoryAccessLog, User
-from app.utils.db import get_user_and_app
-from app.auth import get_user_record, require_user_role
-import uuid
 import datetime
+import json
+import logging
+import uuid
+from typing import Any, Dict, List, Mapping, Union
+
+from app.auth import get_user_record
+from app.database import SessionLocal
+from app.models import Memory, MemoryAccessLog, MemoryState, MemoryStatusHistory, User
+from app.utils.db import get_user_and_app
+from app.utils.memory import get_memory_client
+from app.utils.memory_client import log_memory_access, search_memories
 from app.utils.permissions import check_memory_access_permissions
-from app.utils.memory_client import search_memories, log_memory_access
+from app.utils.telemetry import (
+    _attach_trace_context_from_request,
+    _detach_trace_context,
+    _record_exception,
+)
+from dotenv import load_dotenv
+from fastapi import Depends, FastAPI, Request
+from fastapi.routing import APIRouter
+from mcp.server.fastmcp import FastMCP
+from mcp.server.sse import SseServerTransport
+from opentelemetry import trace
+from opentelemetry.trace import SpanKind
 from qdrant_client import models as qdrant_models
-from typing import Union
 
 # Load environment variables
 load_dotenv()
@@ -60,26 +63,6 @@ user_id_var: contextvars.ContextVar[str] = contextvars.ContextVar("user_id")
 client_name_var: contextvars.ContextVar[str] = contextvars.ContextVar("client_name")
 
 _TRACER = trace.get_tracer("mem0.mcp")
-
-
-def _attach_trace_context_from_request(request: Request) -> Optional[object]:
-    """Attach OpenTelemetry context derived from incoming request headers."""
-    try:
-        context = extract(request.headers)
-    except Exception as exc:  # pragma: no cover - defensive logging
-        logging.debug("Failed to extract trace context: %s", exc)
-        return None
-    return otel_context.attach(context)
-
-
-def _detach_trace_context(token: Optional[object]) -> None:
-    if token is not None:
-        otel_context.detach(token)
-
-
-def _record_exception(span, exc: Exception) -> None:
-    span.record_exception(exc)
-    span.set_status(Status(StatusCode.ERROR, str(exc)))
 
 # Create a router for MCP endpoints
 mcp_router = APIRouter(prefix="/mcp")
@@ -574,7 +557,7 @@ async def handle_post_message(request: Request):
 
 def setup_mcp_server(app: FastAPI):
     """Setup MCP server with the FastAPI application"""
-    mcp._mcp_server.name = f"mem0-mcp-server"
+    mcp._mcp_server.name = "mem0-mcp-server"
 
     # Include MCP router in the FastAPI app
     app.include_router(mcp_router)

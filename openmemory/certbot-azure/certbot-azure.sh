@@ -1,5 +1,28 @@
 #!/bin/bash
-set -e
+set -euo pipefail
+
+run_keepalive() {
+  set -euo pipefail
+  trap 'echo "SIGTERM received, exiting"; exit 0' TERM INT
+  echo "Startup tasks completed; entering keepalive"
+  exec bash -c 'while true; do date; sleep 15; done'
+}
+
+error_exit() {    
+  log_error "=== Certificate management failed ==="
+  # Keep container alive if requested
+  if [ "${CERTMGR_KEEPALIVE:-false}" = "true" ]; then
+    run_keepalive
+  fi  
+  exit 1
+}
+
+on_error() {
+  local exit_code=$?
+  echo "ERROR: command failed at line $1 (exit $exit_code): $BASH_COMMAND"
+  error_exit
+}
+trap 'on_error $LINENO' ERR
 
 # Certificate Management Script for Certbot with deSEC and Azure Key Vault
 # Supports requesting and renewing Let's Encrypt certificates via DNS challenge
@@ -24,6 +47,19 @@ AZURE_CERT_NAME="${8:-${CERTMGR_AZURE_CERT_NAME}}"
 RENEWAL_MODE="${9:-${CERTMGR_RENEWAL_MODE:-false}}"
 STAGING="${10:-${CERTMGR_STAGING:-false}}"
 
+echo "=== Certbot Azure Certificate Manager configuration ==="
+echo "Domain: $CERTMGR_DOMAIN"
+echo "Email: $EMAIL"
+echo "deSEC Token: [Secret Hidden]"
+echo "Azure Tenant ID: $AZURE_TENANT_ID"
+echo "Azure Client ID: $AZURE_CLIENT_ID"
+echo "Azure Client Secret: [Secret Hidden]"
+echo "Key Vault: $AZURE_KEYVAULT_NAME"
+echo "Certificate Name: $AZURE_CERT_NAME"
+echo "Renewal Mode: $RENEWAL_MODE"
+echo "Staging: $STAGING"
+echo "Keepalive: ${CERTMGR_KEEPALIVE:-false}"
+
 # ============================================================================
 # Helper Functions
 # ============================================================================
@@ -42,7 +78,6 @@ log_error() {
 
 validate_required_params() {
     local missing_params=()
-    
     [ -z "$DOMAIN" ] && missing_params+=("DOMAIN")
     [ -z "$EMAIL" ] && missing_params+=("EMAIL")
     [ -z "$DESEC_TOKEN" ] && missing_params+=("DESEC_TOKEN")
@@ -51,12 +86,12 @@ validate_required_params() {
     [ -z "$AZURE_CLIENT_SECRET" ] && missing_params+=("AZURE_CLIENT_SECRET")
     [ -z "$AZURE_KEYVAULT_NAME" ] && missing_params+=("AZURE_KEYVAULT_NAME")
     [ -z "$AZURE_CERT_NAME" ] && missing_params+=("AZURE_CERT_NAME")
-    
+
     if [ ${#missing_params[@]} -gt 0 ]; then
         log_error "Missing required parameters: ${missing_params[*]}"
         log_error "Usage: $0 <domain> <email> <desec_token> <azure_tenant_id> <azure_client_id> <azure_client_secret> <azure_keyvault_name> <azure_cert_name> [renewal_mode] [staging]"
         log_error "Or set environment variables: CERTMGR_DOMAIN, CERTMGR_EMAIL, CERTMGR_DESEC_TOKEN, CERTMGR_AZURE_TENANT_ID, CERTMGR_AZURE_CLIENT_ID, CERTMGR_AZURE_CLIENT_SECRET, CERTMGR_AZURE_KEYVAULT_NAME, CERTMGR_AZURE_CERT_NAME"
-        exit 1
+        error_exit
     fi
 }
 
@@ -70,7 +105,7 @@ setup_output_directory() {
     # Check if we can write to the directory
     if [ ! -w "/mnt/secrets-output" ]; then
         log_error "/mnt/secrets-output is not writable"
-        exit 1
+        error_exit
     fi
     
     log_info "Output directory: /mnt/secrets-output"
@@ -81,19 +116,18 @@ setup_output_directory() {
 # ============================================================================
 
 request_certificate() {
-    log_info "Starting certificate request for domain: $DOMAIN"
-    
+    log_info "Starting certificate request for domain: $DOMAIN"    
     # Create deSEC credentials file
-    local desec_creds="/tmp/desec-credentials.ini"
+    mkdir -p "/etc/letsencrypt/$DOMAIN"
+    local desec_creds="/etc/letsencrypt/$DOMAIN/desec-credentials.ini"
     cat > "$desec_creds" <<EOF
 dns_desec_token = $DESEC_TOKEN
-dns_desec_endpoint = https://desec.io
 EOF
     chmod 600 "$desec_creds"
     
     # Build certbot command
-    local certbot_cmd="certbot certonly"
-    certbot_cmd="$certbot_cmd --dns-desec"
+    local certbot_cmd="certbot certonly -v"
+    certbot_cmd="$certbot_cmd --authenticator dns-desec"
     certbot_cmd="$certbot_cmd --dns-desec-credentials $desec_creds"
     certbot_cmd="$certbot_cmd --dns-desec-propagation-seconds 60"
     certbot_cmd="$certbot_cmd --non-interactive"
@@ -120,7 +154,7 @@ EOF
     else
         log_error "Failed to obtain certificate"
         rm -f "$desec_creds"
-        exit 1
+        error_exit
     fi
     
     # Clean up credentials file
@@ -131,11 +165,11 @@ export_certificates() {
     log_info "Exporting certificates to /mnt/secrets-output"
     
     # Determine certificate path
-    local cert_path="/etc/letsencrypt/live/$DOMAIN"
+    local cert_path="/live/$DOMAIN"
     
     if [ ! -d "$cert_path" ]; then
         log_error "Certificate directory not found: $cert_path"
-        exit 1
+        error_exit
     fi
     
     # Copy certificates to output directory
@@ -164,7 +198,7 @@ upload_to_azure_keyvault() {
         log_success "Azure authentication successful"
     else
         log_error "Azure authentication failed"
-        exit 1
+        error_exit
     fi
     
     log_info "Uploading certificate to Azure Key Vault: $AZURE_KEYVAULT_NAME"
@@ -191,7 +225,7 @@ upload_to_azure_keyvault() {
     else
         log_error "Failed to upload certificate to Azure Key Vault"
         rm -f "$pfx_file"
-        exit 1
+        error_exit
     fi
     
     # Clean up
@@ -207,7 +241,7 @@ upload_to_azure_keyvault() {
 # ============================================================================
 
 main() {
-    log_info "=== Certbot Azure Certificate Manager ==="
+    log_info "=== Starting ==="
     
     # Validate parameters
     validate_required_params
@@ -228,8 +262,7 @@ main() {
     
     # Keep container alive if requested
     if [ "${CERTMGR_KEEPALIVE:-false}" = "true" ]; then
-        log_info "CERTMGR_KEEPALIVE is set, launching bash shell..."
-        exec /bin/bash
+        run_keepalive
     fi
 }
 

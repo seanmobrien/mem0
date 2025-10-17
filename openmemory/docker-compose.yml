@@ -87,6 +87,34 @@ services:
       - keycloak
       - openmemory-mcp
 
+  # Certbot Azure - Let's Encrypt certificate manager with Azure Key Vault integration
+  certbot-azure:
+    build:
+      context: certbot-azure/
+      dockerfile: Dockerfile
+    image: openmemory/certbot-azure:latest
+    volumes:
+      - certbot-certs:/mnt/secrets-output
+    environment:
+      # Certificate configuration
+      - CERTMGR_DOMAIN=${CERTMGR_DOMAIN}
+      - CERTMGR_EMAIL=${CERTMGR_EMAIL}
+      - CERTMGR_DESEC_TOKEN=${CERTMGR_DESEC_TOKEN}
+      # Azure configuration
+      - CERTMGR_AZURE_TENANT_ID=${CERTMGR_AZURE_TENANT_ID}
+      - CERTMGR_AZURE_CLIENT_ID=${CERTMGR_AZURE_CLIENT_ID}
+      - CERTMGR_AZURE_CLIENT_SECRET=${CERTMGR_AZURE_CLIENT_SECRET}
+      - CERTMGR_AZURE_KEYVAULT_NAME=${CERTMGR_AZURE_KEYVAULT_NAME}
+      - CERTMGR_AZURE_CERT_NAME=${CERTMGR_AZURE_CERT_NAME}
+      # Optional configuration
+      - CERTMGR_RENEWAL_MODE=${CERTMGR_RENEWAL_MODE:-false}
+      - CERTMGR_STAGING=${CERTMGR_STAGING:-false}
+      - CERTMGR_KEEPALIVE=${CERTMGR_KEEPALIVE:-false}
+    # Comment out to run the service, uncomment to disable
+    profiles:
+      - certbot
+
 volumes:
   mem0_storage:
   keycloak_db:
+  certbot-certs:

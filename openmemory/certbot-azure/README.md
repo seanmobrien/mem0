@@ -1,11 +1,12 @@
 # Certbot Azure - Let's Encrypt Certificate Manager
 
-Docker container for automated Let's Encrypt certificate management with deSEC DNS challenge and Azure Key Vault integration.
+Docker container for automated Let's Encrypt certificate management with DNS challenge (deSEC or Cloudflare) and Azure Key Vault integration.
 
 ## Overview
 
 This container provides a complete solution for:
-- Requesting Let's Encrypt SSL/TLS certificates via DNS challenge using deSEC
+- Requesting Let's Encrypt SSL/TLS certificates via DNS challenge using deSEC or Cloudflare
+- Automatic DNS provider detection based on domain nameservers
 - Automatically uploading certificates to Azure Key Vault
 - Renewing existing certificates
 - Writing certificates to local storage (mounted volumes or ephemeral)
@@ -13,7 +14,8 @@ This container provides a complete solution for:
 ## Features
 
 - **Base Image**: Built on official `certbot/certbot` image
-- **DNS Challenge**: Uses `certbot-dns-desec` plugin for DNS-01 challenge
+- **DNS Challenge**: Uses `certbot-dns-desec` or `certbot-dns-cloudflare` plugin for DNS-01 challenge
+- **Automatic Provider Detection**: Automatically detects DNS provider by querying nameservers
 - **Azure Integration**: Includes Azure CLI for Key Vault management
 - **Security Best Practices**:
   - Multi-stage build (separate build and runtime layers)
@@ -25,10 +27,12 @@ This container provides a complete solution for:
 
 ## Prerequisites
 
-1. **deSEC Account**: Register at https://desec.io and obtain an API token
+1. **DNS Provider**: Choose one of the following:
+   - **deSEC Account**: Register at https://desec.io and obtain an API token
+   - **Cloudflare Account**: Create an API token at https://dash.cloudflare.com/profile/api-tokens with Zone:DNS:Edit permissions
 2. **Azure Service Principal**: Create a service principal with permissions to manage Key Vault certificates
 3. **Azure Key Vault**: Pre-existing Key Vault where certificates will be stored
-4. **Domain**: Domain name configured with deSEC nameservers
+4. **Domain**: Domain name configured with either deSEC or Cloudflare nameservers
 
 ## Quick Start
 
@@ -47,6 +51,7 @@ vim .env
 
 ### Using Docker Run
 
+**With deSEC:**
 ```bash
 docker run --rm \
   -v /path/to/certs:/mnt/secrets-output \
@@ -59,6 +64,21 @@ docker run --rm \
   azure_client_secret \
   my-keyvault \
   my-cert-name
+```
+
+**With Cloudflare (automatic detection):**
+```bash
+docker run --rm \
+  -v /path/to/certs:/mnt/secrets-output \
+  -e CERTMGR_DOMAIN=example.com \
+  -e CERTMGR_EMAIL=admin@example.com \
+  -e CERTMGR_CLOUDFLARE_TOKEN=cloudflare_api_token \
+  -e CERTMGR_AZURE_TENANT_ID=tenant_id \
+  -e CERTMGR_AZURE_CLIENT_ID=client_id \
+  -e CERTMGR_AZURE_CLIENT_SECRET=client_secret \
+  -e CERTMGR_AZURE_KEYVAULT_NAME=my-keyvault \
+  -e CERTMGR_AZURE_CERT_NAME=my-cert-name \
+  openmemory/certbot-azure
 ```
 
 ### Using Environment Variables
@@ -105,12 +125,15 @@ docker service create \
 |-------------------|---------------------|-------------|
 | 1 | `CERTMGR_DOMAIN` | Domain name for certificate |
 | 2 | `CERTMGR_EMAIL` | Email for Let's Encrypt registration |
-| 3 | `CERTMGR_DESEC_TOKEN` | deSEC API token |
+| 3 | `CERTMGR_DESEC_TOKEN` | deSEC API token (for deSEC provider) |
+| - | `CERTMGR_CLOUDFLARE_TOKEN` | Cloudflare API token (for Cloudflare provider) |
 | 4 | `CERTMGR_AZURE_TENANT_ID` | Azure tenant ID |
 | 5 | `CERTMGR_AZURE_CLIENT_ID` | Azure client/application ID |
 | 6 | `CERTMGR_AZURE_CLIENT_SECRET` | Azure client secret |
 | 7 | `CERTMGR_AZURE_KEYVAULT_NAME` | Azure Key Vault name |
 | 8 | `CERTMGR_AZURE_CERT_NAME` | Certificate name in Key Vault |
+
+**Note**: At least one DNS provider token (DESEC_TOKEN or CLOUDFLARE_TOKEN) is required. The system will automatically detect which provider to use based on your domain's nameservers.
 
 ### Optional Parameters/Environment Variables
 
@@ -118,7 +141,43 @@ docker service create \
 |-------------------|---------------------|---------|-------------|
 | 9 | `CERTMGR_RENEWAL_MODE` | `false` | Set to `true` to renew existing certificate |
 | 10 | `CERTMGR_STAGING` | `false` | Set to `true` to use Let's Encrypt staging environment |
+| - | `CERTMGR_DNS_PROVIDER` | `auto` | Explicitly set DNS provider: `auto`, `desec`, or `cloudflare` |
 | - | `CERTMGR_KEEPALIVE` | - | Set to `true` to keep container running (launches bash shell) |
+
+## DNS Provider Detection
+
+The container automatically detects your DNS provider by querying the nameservers for your domain. It supports:
+
+- **deSEC**: Domains using `*.desec.io` or `*.desec.org` nameservers
+- **Cloudflare**: Domains using `*.cloudflare.com` nameservers
+
+The detection algorithm:
+1. Queries nameservers for the provided domain
+2. If no nameservers are found, queries parent domain recursively
+3. Matches nameserver patterns to determine provider
+4. Validates that appropriate credentials are available
+
+You can bypass automatic detection by setting `CERTMGR_DNS_PROVIDER` explicitly to `desec` or `cloudflare`.
+
+## Setting Up DNS Providers
+
+### deSEC Setup
+
+1. Register at https://desec.io
+2. Create a domain or add your existing domain
+3. Update your domain's nameservers to deSEC's nameservers
+4. Generate an API token in the deSEC dashboard
+5. Set `CERTMGR_DESEC_TOKEN` environment variable
+
+### Cloudflare Setup
+
+1. Add your domain to Cloudflare
+2. Update your domain's nameservers to Cloudflare's nameservers
+3. Create an API token at https://dash.cloudflare.com/profile/api-tokens
+   - Use the "Edit zone DNS" template
+   - Grant "Zone:DNS:Edit" permissions
+   - Scope to specific zones or all zones
+4. Set `CERTMGR_CLOUDFLARE_TOKEN` environment variable
 
 ## Output Files
 
@@ -226,7 +285,7 @@ Images are automatically tagged and pushed to `schoollawregistry.azurecr.io/open
 
 ## Examples
 
-### Wildcard Certificate
+### Wildcard Certificate with deSEC
 
 ```bash
 docker run --rm \
@@ -240,6 +299,22 @@ docker run --rm \
   $AZURE_CLIENT_SECRET \
   my-keyvault \
   wildcard-cert
+```
+
+### Wildcard Certificate with Cloudflare
+
+```bash
+docker run --rm \
+  -v ./certs:/mnt/secrets-output \
+  -e CERTMGR_DOMAIN="*.example.com" \
+  -e CERTMGR_EMAIL=admin@example.com \
+  -e CERTMGR_CLOUDFLARE_TOKEN=$CLOUDFLARE_TOKEN \
+  -e CERTMGR_AZURE_TENANT_ID=$AZURE_TENANT_ID \
+  -e CERTMGR_AZURE_CLIENT_ID=$AZURE_CLIENT_ID \
+  -e CERTMGR_AZURE_CLIENT_SECRET=$AZURE_CLIENT_SECRET \
+  -e CERTMGR_AZURE_KEYVAULT_NAME=my-keyvault \
+  -e CERTMGR_AZURE_CERT_NAME=wildcard-cert \
+  openmemory/certbot-azure
 ```
 
 ### Multiple Domains
@@ -267,10 +342,20 @@ Add to crontab for automatic renewal:
 ### DNS Challenge Issues
 
 If DNS challenge fails:
-1. Verify deSEC token is valid
-2. Ensure domain is configured with deSEC nameservers
-3. Check DNS propagation: `dig @ns1.desec.io your-domain.com TXT`
-4. Increase propagation wait time if needed (modify Dockerfile)
+1. Verify the correct DNS provider token is set (deSEC or Cloudflare)
+2. Ensure domain is configured with the correct nameservers
+3. For deSEC: Check DNS propagation with `dig @ns1.desec.io your-domain.com TXT`
+4. For Cloudflare: Check DNS propagation with `dig @1.1.1.1 your-domain.com TXT`
+5. Check container logs for provider detection messages
+6. If auto-detection fails, set `CERTMGR_DNS_PROVIDER` explicitly
+
+### Provider Detection Issues
+
+If the system cannot detect your DNS provider:
+1. Verify your domain's nameservers: `dig NS your-domain.com`
+2. Ensure nameservers point to supported providers (deSEC or Cloudflare)
+3. Set `CERTMGR_DNS_PROVIDER` explicitly to bypass auto-detection
+4. Check container logs for detailed detection messages
 
 ### Azure Authentication Failures
 
@@ -309,6 +394,8 @@ docker exec -it <container_id> cat /var/log/letsencrypt/letsencrypt.log
 - [Certbot Documentation](https://eff-certbot.readthedocs.io/)
 - [deSEC API Documentation](https://desec.readthedocs.io/)
 - [certbot-dns-desec Plugin](https://github.com/desec-io/certbot-dns-desec)
+- [Cloudflare API Documentation](https://developers.cloudflare.com/api/)
+- [certbot-dns-cloudflare Plugin](https://github.com/cloudflare/certbot-dns-cloudflare)
 - [Azure CLI Key Vault Reference](https://docs.microsoft.com/en-us/cli/azure/keyvault/certificate)
 - [Let's Encrypt DNS Challenge Guide](https://nerdsniped.se/posts/lets-encrypt-wildcard-certs-with-desec/)
 

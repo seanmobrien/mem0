@@ -2,7 +2,7 @@
 FROM certbot/certbot:latest
 
 LABEL org.opencontainers.image.name="openmemory/certbot-azure"
-LABEL org.opencontainers.image.description="Certbot with deSEC DNS challenge and Azure Key Vault integration"
+LABEL org.opencontainers.image.description="Certbot with deSEC/Cloudflare DNS challenge and Azure Key Vault integration"
 LABEL org.opencontainers.image.source="https://github.com/seanmobrien/mem0"
 
 # Switch to root for package installation
@@ -29,6 +29,9 @@ RUN apk add --no-cache \
 # Install Python packages
 RUN pip install --no-cache-dir certbot-dns-desec || \
     (sleep 5 && pip install --no-cache-dir certbot-dns-desec)
+
+RUN pip install --no-cache-dir certbot-dns-cloudflare || \
+    (sleep 5 && pip install --no-cache-dir certbot-dns-cloudflare)
 
 RUN pip install --no-cache-dir azure-cli || \
     (sleep 5 && pip install --no-cache-dir azure-cli)

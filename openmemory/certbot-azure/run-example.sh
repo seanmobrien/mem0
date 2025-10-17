@@ -22,8 +22,6 @@ CERTS_DIR="${CERTS_DIR:-./certs}"
 mkdir -p "$CERTS_DIR"
 
 echo "Starting certbot-azure container..."
-echo "Domain: $CERTMGR_DOMAIN"
-echo "Output directory: $CERTS_DIR"
 
 # Run the container
 docker run --rm \
@@ -40,6 +38,7 @@ docker run --rm \
     -e CERTMGR_AZURE_CERT_NAME="$CERTMGR_AZURE_CERT_NAME" \
     -e CERTMGR_RENEWAL_MODE="${CERTMGR_RENEWAL_MODE:-false}" \
     -e CERTMGR_STAGING="${CERTMGR_STAGING:-false}" \
+    -e CERTMGR_KEEPALIVE="${CERTMGR_KEEPALIVE:-false}" \
     openmemory/certbot-azure
 
 echo "Certificate management completed!"

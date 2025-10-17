@@ -51,7 +51,6 @@ vim .env
 
 ### Using Docker Run
 
-**With deSEC:**
 ```bash
 docker run --rm \
   -v /path/to/certs:/mnt/secrets-output \
@@ -64,21 +63,6 @@ docker run --rm \
   azure_client_secret \
   my-keyvault \
   my-cert-name
-```
-
-**With Cloudflare (automatic detection):**
-```bash
-docker run --rm \
-  -v /path/to/certs:/mnt/secrets-output \
-  -e CERTMGR_DOMAIN=example.com \
-  -e CERTMGR_EMAIL=admin@example.com \
-  -e CERTMGR_CLOUDFLARE_TOKEN=cloudflare_api_token \
-  -e CERTMGR_AZURE_TENANT_ID=tenant_id \
-  -e CERTMGR_AZURE_CLIENT_ID=client_id \
-  -e CERTMGR_AZURE_CLIENT_SECRET=client_secret \
-  -e CERTMGR_AZURE_KEYVAULT_NAME=my-keyvault \
-  -e CERTMGR_AZURE_CERT_NAME=my-cert-name \
-  openmemory/certbot-azure
 ```
 
 ### Using Environment Variables
@@ -285,7 +269,7 @@ Images are automatically tagged and pushed to `schoollawregistry.azurecr.io/open
 
 ## Examples
 
-### Wildcard Certificate with deSEC
+### Wildcard Certificate
 
 ```bash
 docker run --rm \
@@ -299,22 +283,6 @@ docker run --rm \
   $AZURE_CLIENT_SECRET \
   my-keyvault \
   wildcard-cert
-```
-
-### Wildcard Certificate with Cloudflare
-
-```bash
-docker run --rm \
-  -v ./certs:/mnt/secrets-output \
-  -e CERTMGR_DOMAIN="*.example.com" \
-  -e CERTMGR_EMAIL=admin@example.com \
-  -e CERTMGR_CLOUDFLARE_TOKEN=$CLOUDFLARE_TOKEN \
-  -e CERTMGR_AZURE_TENANT_ID=$AZURE_TENANT_ID \
-  -e CERTMGR_AZURE_CLIENT_ID=$AZURE_CLIENT_ID \
-  -e CERTMGR_AZURE_CLIENT_SECRET=$AZURE_CLIENT_SECRET \
-  -e CERTMGR_AZURE_KEYVAULT_NAME=my-keyvault \
-  -e CERTMGR_AZURE_CERT_NAME=wildcard-cert \
-  openmemory/certbot-azure
 ```
 
 ### Multiple Domains
@@ -342,20 +310,10 @@ Add to crontab for automatic renewal:
 ### DNS Challenge Issues
 
 If DNS challenge fails:
-1. Verify the correct DNS provider token is set (deSEC or Cloudflare)
-2. Ensure domain is configured with the correct nameservers
-3. For deSEC: Check DNS propagation with `dig @ns1.desec.io your-domain.com TXT`
-4. For Cloudflare: Check DNS propagation with `dig @1.1.1.1 your-domain.com TXT`
-5. Check container logs for provider detection messages
-6. If auto-detection fails, set `CERTMGR_DNS_PROVIDER` explicitly
-
-### Provider Detection Issues
-
-If the system cannot detect your DNS provider:
-1. Verify your domain's nameservers: `dig NS your-domain.com`
-2. Ensure nameservers point to supported providers (deSEC or Cloudflare)
-3. Set `CERTMGR_DNS_PROVIDER` explicitly to bypass auto-detection
-4. Check container logs for detailed detection messages
+1. Verify deSEC token is valid
+2. Ensure domain is configured with deSEC nameservers
+3. Check DNS propagation: `dig @ns1.desec.io your-domain.com TXT`
+4. Increase propagation wait time if needed (modify Dockerfile)
 
 ### Azure Authentication Failures
 
@@ -394,8 +352,6 @@ docker exec -it <container_id> cat /var/log/letsencrypt/letsencrypt.log
 - [Certbot Documentation](https://eff-certbot.readthedocs.io/)
 - [deSEC API Documentation](https://desec.readthedocs.io/)
 - [certbot-dns-desec Plugin](https://github.com/desec-io/certbot-dns-desec)
-- [Cloudflare API Documentation](https://developers.cloudflare.com/api/)
-- [certbot-dns-cloudflare Plugin](https://github.com/cloudflare/certbot-dns-cloudflare)
 - [Azure CLI Key Vault Reference](https://docs.microsoft.com/en-us/cli/azure/keyvault/certificate)
 - [Let's Encrypt DNS Challenge Guide](https://nerdsniped.se/posts/lets-encrypt-wildcard-certs-with-desec/)
 

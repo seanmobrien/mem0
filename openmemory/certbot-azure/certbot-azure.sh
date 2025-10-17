@@ -1,5 +1,28 @@
 #!/bin/bash
-set -e
+set -euo pipefail
+
+run_keepalive() {
+  set -euo pipefail
+  trap 'echo "SIGTERM received, exiting"; exit 0' TERM INT
+  echo "Startup tasks completed; entering keepalive"
+  exec bash -c 'while true; do date; sleep 15; done'
+}
+
+error_exit() {    
+  log_error "=== Certificate management failed ==="
+  # Keep container alive if requested
+  if [ "${CERTMGR_KEEPALIVE:-false}" = "true" ]; then
+    run_keepalive
+  fi  
+  exit 1
+}
+
+on_error() {
+  local exit_code=$?
+  echo "ERROR: command failed at line $1 (exit $exit_code): $BASH_COMMAND"
+  error_exit
+}
+trap 'on_error $LINENO' ERR
 
 # Certificate Management Script for Certbot with DNS Providers and Azure Key Vault
 # Supports requesting and renewing Let's Encrypt certificates via DNS challenge
@@ -29,6 +52,21 @@ STAGING="${10:-${CERTMGR_STAGING:-false}}"
 # DNS Provider (auto-detected if not specified)
 DNS_PROVIDER="${CERTMGR_DNS_PROVIDER:-auto}"
 
+echo "=== Certbot Azure Certificate Manager configuration ==="
+echo "Domain: $CERTMGR_DOMAIN"
+echo "Email: $EMAIL"
+echo "DNS Provider: $DNS_PROVIDER"
+echo "deSEC Token: [Secret Hidden]"
+echo "Cloudflare Token: [Secret Hidden]"
+echo "Azure Tenant ID: $AZURE_TENANT_ID"
+echo "Azure Client ID: $AZURE_CLIENT_ID"
+echo "Azure Client Secret: [Secret Hidden]"
+echo "Key Vault: $AZURE_KEYVAULT_NAME"
+echo "Certificate Name: $AZURE_CERT_NAME"
+echo "Renewal Mode: $RENEWAL_MODE"
+echo "Staging: $STAGING"
+echo "Keepalive: ${CERTMGR_KEEPALIVE:-false}"
+
 # ============================================================================
 # Helper Functions
 # ============================================================================
@@ -47,7 +85,6 @@ log_error() {
 
 validate_required_params() {
     local missing_params=()
-    
     [ -z "$DOMAIN" ] && missing_params+=("DOMAIN")
     [ -z "$EMAIL" ] && missing_params+=("EMAIL")
     [ -z "$AZURE_TENANT_ID" ] && missing_params+=("AZURE_TENANT_ID")
@@ -55,13 +92,13 @@ validate_required_params() {
     [ -z "$AZURE_CLIENT_SECRET" ] && missing_params+=("AZURE_CLIENT_SECRET")
     [ -z "$AZURE_KEYVAULT_NAME" ] && missing_params+=("AZURE_KEYVAULT_NAME")
     [ -z "$AZURE_CERT_NAME" ] && missing_params+=("AZURE_CERT_NAME")
-    
+
     if [ ${#missing_params[@]} -gt 0 ]; then
         log_error "Missing required parameters: ${missing_params[*]}"
         log_error "Usage: $0 <domain> <email> <desec_token> <azure_tenant_id> <azure_client_id> <azure_client_secret> <azure_keyvault_name> <azure_cert_name> [renewal_mode] [staging]"
         log_error "Or set environment variables: CERTMGR_DOMAIN, CERTMGR_EMAIL, CERTMGR_AZURE_TENANT_ID, CERTMGR_AZURE_CLIENT_ID, CERTMGR_AZURE_CLIENT_SECRET, CERTMGR_AZURE_KEYVAULT_NAME, CERTMGR_AZURE_CERT_NAME"
         log_error "DNS Provider tokens: CERTMGR_DESEC_TOKEN or CERTMGR_CLOUDFLARE_TOKEN (or both for auto-detection)"
-        exit 1
+        error_exit
     fi
 }
 
@@ -75,7 +112,7 @@ setup_output_directory() {
     # Check if we can write to the directory
     if [ ! -w "/mnt/secrets-output" ]; then
         log_error "/mnt/secrets-output is not writable"
-        exit 1
+        error_exit
     fi
     
     log_info "Output directory: /mnt/secrets-output"
@@ -150,7 +187,7 @@ detect_dns_provider() {
     log_error "Unable to detect DNS provider automatically"
     log_error "Supported providers: deSEC (*.desec.io, *.desec.org nameservers), Cloudflare (*.cloudflare.com nameservers)"
     log_error "Please set CERTMGR_DNS_PROVIDER explicitly to 'desec' or 'cloudflare'"
-    exit 1
+    error_exit
 }
 
 validate_provider_credentials() {
@@ -160,20 +197,20 @@ validate_provider_credentials() {
         desec)
             if [ -z "$DESEC_TOKEN" ]; then
                 log_error "deSEC provider selected but CERTMGR_DESEC_TOKEN is not set"
-                exit 1
+                error_exit
             fi
             log_success "deSEC credentials validated"
             ;;
         cloudflare)
             if [ -z "$CLOUDFLARE_TOKEN" ]; then
                 log_error "Cloudflare provider selected but CERTMGR_CLOUDFLARE_TOKEN is not set"
-                exit 1
+                error_exit
             fi
             log_success "Cloudflare credentials validated"
             ;;
         *)
             log_error "Unknown DNS provider: $DNS_PROVIDER"
-            exit 1
+            error_exit
             ;;
     esac
 }
@@ -186,39 +223,40 @@ request_certificate() {
     log_info "Starting certificate request for domain: $DOMAIN"
     log_info "Using DNS provider: $DNS_PROVIDER"
     
-    local certbot_cmd="certbot certonly"
+    local certbot_cmd="certbot certonly -v"
     local creds_file=""
     
     # Configure DNS plugin based on provider
     case "$DNS_PROVIDER" in
         desec)
             # Create deSEC credentials file
-            creds_file="/tmp/desec-credentials.ini"
+            mkdir -p "/etc/letsencrypt/$DOMAIN"
+            creds_file="/etc/letsencrypt/$DOMAIN/desec-credentials.ini"
             cat > "$creds_file" <<EOF
 dns_desec_token = $DESEC_TOKEN
-dns_desec_endpoint = https://desec.io
 EOF
             chmod 600 "$creds_file"
             
-            certbot_cmd="$certbot_cmd --dns-desec"
+            certbot_cmd="$certbot_cmd --authenticator dns-desec"
             certbot_cmd="$certbot_cmd --dns-desec-credentials $creds_file"
             certbot_cmd="$certbot_cmd --dns-desec-propagation-seconds 60"
             ;;
         cloudflare)
             # Create Cloudflare credentials file
-            creds_file="/tmp/cloudflare-credentials.ini"
+            mkdir -p "/etc/letsencrypt/$DOMAIN"
+            creds_file="/etc/letsencrypt/$DOMAIN/cloudflare-credentials.ini"
             cat > "$creds_file" <<EOF
 dns_cloudflare_api_token = $CLOUDFLARE_TOKEN
 EOF
             chmod 600 "$creds_file"
             
-            certbot_cmd="$certbot_cmd --dns-cloudflare"
+            certbot_cmd="$certbot_cmd --authenticator dns-cloudflare"
             certbot_cmd="$certbot_cmd --dns-cloudflare-credentials $creds_file"
             certbot_cmd="$certbot_cmd --dns-cloudflare-propagation-seconds 60"
             ;;
         *)
             log_error "Unsupported DNS provider: $DNS_PROVIDER"
-            exit 1
+            error_exit
             ;;
     esac
     
@@ -247,7 +285,7 @@ EOF
     else
         log_error "Failed to obtain certificate"
         [ -n "$creds_file" ] && rm -f "$creds_file"
-        exit 1
+        error_exit
     fi
     
     # Clean up credentials file
@@ -258,11 +296,11 @@ export_certificates() {
     log_info "Exporting certificates to /mnt/secrets-output"
     
     # Determine certificate path
-    local cert_path="/etc/letsencrypt/live/$DOMAIN"
+    local cert_path="/live/$DOMAIN"
     
     if [ ! -d "$cert_path" ]; then
         log_error "Certificate directory not found: $cert_path"
-        exit 1
+        error_exit
     fi
     
     # Copy certificates to output directory
@@ -291,7 +329,7 @@ upload_to_azure_keyvault() {
         log_success "Azure authentication successful"
     else
         log_error "Azure authentication failed"
-        exit 1
+        error_exit
     fi
     
     log_info "Uploading certificate to Azure Key Vault: $AZURE_KEYVAULT_NAME"
@@ -318,7 +356,7 @@ upload_to_azure_keyvault() {
     else
         log_error "Failed to upload certificate to Azure Key Vault"
         rm -f "$pfx_file"
-        exit 1
+        error_exit
     fi
     
     # Clean up
@@ -334,7 +372,7 @@ upload_to_azure_keyvault() {
 # ============================================================================
 
 main() {
-    log_info "=== Certbot Azure Certificate Manager ==="
+    log_info "=== Starting ==="
     
     # Validate parameters
     validate_required_params
@@ -359,8 +397,7 @@ main() {
     
     # Keep container alive if requested
     if [ "${CERTMGR_KEEPALIVE:-false}" = "true" ]; then
-        log_info "CERTMGR_KEEPALIVE is set, launching bash shell..."
-        exec /bin/bash
+        run_keepalive
     fi
 }
 

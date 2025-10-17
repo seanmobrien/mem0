@@ -109,7 +109,7 @@ class VectorStoreFactory:
                     original_search = instance.search
 
                     # Async provider support
-                    if inspect.iscoroutinefunction(original_search):
+                    if inspect.iscoroutinefunction(getattr(original_search, '__func__', original_search)):
                         async def _wrapped_search(*args, **kwargs):
                             with tracer.start_as_current_span("vector_store.provider_search") as span:
                                 try:

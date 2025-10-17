@@ -9,8 +9,8 @@ from typing import Optional
 
 from azure.monitor.opentelemetry import configure_azure_monitor
 from opentelemetry import trace
-from opentelemetry.trace import Tracer
 from opentelemetry.sdk.resources import Resource
+from opentelemetry.trace import Tracer
 
 _logger = logging.getLogger(__name__)
 _configured = False

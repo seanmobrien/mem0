@@ -2,14 +2,15 @@
 
 from __future__ import annotations
 
-import logging
 import inspect
-from typing import Optional, Callable
+import logging
 from functools import wraps
+from typing import Callable, Optional
 
-from opentelemetry import trace, context as otel_context
-from opentelemetry.trace import SpanKind, Status, StatusCode
+from opentelemetry import context as otel_context
+from opentelemetry import trace
 from opentelemetry.propagate import extract
+from opentelemetry.trace import SpanKind, Status, StatusCode
 
 _logger = logging.getLogger(__name__)
 

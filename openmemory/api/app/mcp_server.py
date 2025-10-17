@@ -19,11 +19,11 @@ import logging
 import json
 from typing import Any, Dict, List, Mapping, Optional
 from mcp.server.fastmcp import FastMCP, Context
-from opentelemetry import context as otel_context, trace
-from opentelemetry.propagate import extract
-from opentelemetry.trace import SpanKind, Status, StatusCode
+from opentelemetry import trace
+from opentelemetry.trace import SpanKind
 from mcp.server.sse import SseServerTransport
 from app.utils.memory import get_memory_client
+from app.utils.telemetry import _attach_trace_context_from_request, _detach_trace_context, _record_exception
 from fastapi import FastAPI, HTTPException, Request, Depends
 from fastapi.routing import APIRouter
 import contextvars
@@ -60,26 +60,6 @@ user_id_var: contextvars.ContextVar[str] = contextvars.ContextVar("user_id")
 client_name_var: contextvars.ContextVar[str] = contextvars.ContextVar("client_name")
 
 _TRACER = trace.get_tracer("mem0.mcp")
-
-
-def _attach_trace_context_from_request(request: Request) -> Optional[object]:
-    """Attach OpenTelemetry context derived from incoming request headers."""
-    try:
-        context = extract(request.headers)
-    except Exception as exc:  # pragma: no cover - defensive logging
-        logging.debug("Failed to extract trace context: %s", exc)
-        return None
-    return otel_context.attach(context)
-
-
-def _detach_trace_context(token: Optional[object]) -> None:
-    if token is not None:
-        otel_context.detach(token)
-
-
-def _record_exception(span, exc: Exception) -> None:
-    span.record_exception(exc)
-    span.set_status(Status(StatusCode.ERROR, str(exc)))
 
 # Create a router for MCP endpoints
 mcp_router = APIRouter(prefix="/mcp")

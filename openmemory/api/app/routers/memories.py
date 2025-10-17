@@ -55,7 +55,7 @@ def traced_endpoint(span_name: str):
                         span.set_attribute("mem0.user_id", getattr(user, "user_id"))
 
                     # app_id or app parameter
-                    app_id = kwargs.get("app_id") or kwargs.get("app") or kwargs.get("request") and None
+                    app_id = kwargs.get("app_id") or kwargs.get("app")
                     if not app_id and "request" in kwargs and hasattr(kwargs["request"], "path_params"):
                         # try to derive from path params
                         path_params = getattr(kwargs["request"], "path_params", {})

@@ -32,6 +32,19 @@ This container provides a complete solution for:
 
 ## Quick Start
 
+### Using the Example Script
+
+The easiest way to get started is using the provided example script:
+
+```bash
+cd openmemory/certbot-azure
+cp .env.example .env
+# Edit .env with your configuration
+vim .env
+# Run the script
+./run-example.sh
+```
+
 ### Using Docker Run
 
 ```bash
@@ -184,6 +197,8 @@ The container will drop into a bash shell after completing certificate operation
 cd openmemory/certbot-azure
 docker build -t openmemory/certbot-azure .
 ```
+
+**Note**: If you encounter network timeouts when fetching Alpine packages, this may be due to network restrictions in your environment. The build should succeed in a standard Docker environment with internet access.
 
 ### Build with Docker Compose
 

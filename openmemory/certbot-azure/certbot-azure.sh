@@ -171,7 +171,8 @@ upload_to_azure_keyvault() {
     
     # Create PFX file from certificate and private key
     local pfx_file="/tmp/certificate.pfx"
-    local pfx_password=$(openssl rand -base64 32)
+    local pfx_password
+    pfx_password=$(openssl rand -base64 32)
     
     # Convert to PFX format
     openssl pkcs12 -export \

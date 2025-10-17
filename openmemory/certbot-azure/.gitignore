@@ -1,0 +1,15 @@
+# Environment files
+.env
+
+# Certificates and keys
+*.pem
+*.crt
+*.key
+*.pfx
+*.p12
+
+# deSEC credentials
+*credentials.ini
+
+# Logs
+*.log

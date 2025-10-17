@@ -67,11 +67,6 @@ async def get_profile(
     # Get total number of apps
     apps = db.query(App).filter(App.owner == user)
     total_apps = apps.count()
-    span = trace.get_current_span()
-    try:
-        span.set_attribute("mem0.user_id", user.user_id)
-    except Exception:
-        pass
 
     return {
         "total_memories": total_memories,

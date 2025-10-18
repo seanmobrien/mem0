@@ -4,8 +4,18 @@ set -euo pipefail
 run_keepalive() {
   set -euo pipefail
   trap 'echo "SIGTERM received, exiting"; exit 0' TERM INT
-  echo "Startup tasks completed; entering keepalive"
-  exec bash -c 'while true; do date; sleep 15; done'
+  echo "Startup tasks completed; entering keepalive - press Ctrl-X to exit"
+# Read from the TTY so Ctrl+X can be detected even when stdin is redirected
+while true; do    
+    # wait up to 15s for a single keypress; -s silent, -n1 one char, -t timeout
+    if read -rsn1 -t 15 key < /dev/tty; then
+        # Ctrl-X is ASCII 0x18
+        if [[ $key == $'\x18' ]]; then
+            echo "Ctrl-X received, exiting"
+            break
+        fi
+    fi
+done
 }
 
 error_exit() {    
@@ -204,7 +214,7 @@ upload_to_azure_keyvault() {
     log_info "Uploading certificate to Azure Key Vault: $AZURE_KEYVAULT_NAME"
     
     # Create PFX file from certificate and private key
-    local pfx_file="/tmp/certificate.pfx"
+    local pfx_file="/etc/letsencrypt/$DOMAIN/certificate.pfx"
     local pfx_password
     pfx_password=$(openssl rand -base64 32)
     

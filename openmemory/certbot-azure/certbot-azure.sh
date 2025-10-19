@@ -273,7 +273,7 @@ EOF
                 local certbot_creds="/etc/letsencrypt/$DOMAIN/certbot-credentials.ini"
                 cat > "$certbot_creds" <<EOF
 dns_cloudflare_email = $CLOUDFLARE_EMAIL
-dns_cloudflare_api_key = $CLOUDFLARE_TOKEN
+dns_cloudflare_api_token = $CLOUDFLARE_TOKEN
 EOF
             chmod 600 "$certbot_creds"
             dns_args="--dns-cloudflare --dns-cloudflare-credentials $certbot_creds --dns-cloudflare-propagation-seconds 60"

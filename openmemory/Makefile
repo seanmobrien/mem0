@@ -1,7 +1,7 @@
 .PHONY: help up down logs shell migrate test test-clean env ui-install ui-start ui-dev ui-build ui-dev-start
 
 NEXT_PUBLIC_USER_ID=$(USER)
-NEXT_PUBLIC_API_URL=https://mem0-api.jollybush-836e15bc.westus3.azurecontainerapps.io
+NEXT_PUBLIC_API_URL=https://mem0-api.compliance-theater.obapps.net
 
 # Default target
 help:

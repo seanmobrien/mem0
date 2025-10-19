@@ -51,8 +51,8 @@ def init_telemetry(connection_string: str, sampling_ratio: Optional[float] = Non
         {
             "service.name": "Mem0-Api",
             "service.instance.id": f"ObApps.ComplianceTheatre-Mem0-Api-{instance_id}",
-            "service.namespace": "mem0-api.jollybush-836e15bc.westus3.azurecontainerapps.io",
-            "ai.cloud.roleBaseName": "mem0-api.jollybush-836e15bc.westus3.azurecontainerapps.io",
+            "service.namespace": "mem0-api.compliance-theater.obapps.net",
+            "ai.cloud.roleBaseName": "mem0-api.compliance-theater.obapps.net",
         }
     )
 

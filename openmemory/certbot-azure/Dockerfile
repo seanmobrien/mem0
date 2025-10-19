@@ -2,7 +2,7 @@
 FROM certbot/certbot:latest
 
 LABEL org.opencontainers.image.name="openmemory/certbot-azure"
-LABEL org.opencontainers.image.description="Certbot with deSEC DNS challenge and Azure Key Vault integration"
+LABEL org.opencontainers.image.description="Certbot with deSEC/Cloudflare DNS challenge and Azure Key Vault integration"
 LABEL org.opencontainers.image.source="https://github.com/seanmobrien/mem0"
 
 # Switch to root for package installation
@@ -22,8 +22,8 @@ RUN set -eux; \
     # install build deps needed for wheels
     retry apk add --no-cache build-base gcc musl-dev libffi-dev python3-dev libffi; \
     mkdir -p /wheels; \
-    # build wheels for our Python dependencies
-    retry python3 -m pip wheel --no-cache-dir --wheel-dir /wheels certbot-dns-desec azure-cli; \
+    # build wheels for our Python dependencies (include Cloudflare python lib)
+    retry python3 -m pip wheel --no-cache-dir --wheel-dir /wheels certbot-dns-desec certbot-dns-cloudflare==latest cloudflare==latest certbot-dns-freedns azure-cli; \
     # clean up build deps in builder (keeps builder small)
     apk del build-base gcc musl-dev libffi-dev python3-dev || true
 
@@ -41,8 +41,15 @@ RUN set -eux; \
     done; \
     }; \
     retry apk update || true; \
-    retry apk add --no-cache bash curl ca-certificates jq openssl
+    retry apk add --no-cache bash curl ca-certificates jq openssl bind-tools
+    # Update package repositories and install runtime dependencies
 
+# Install Python packages from wheels produced in the builder stage
+COPY --from=builder /wheels /wheels
+RUN set -eux; \
+    # install from local wheels to avoid network and compilation in final image
+    python3 -m pip install --no-cache-dir /wheels/*.whl; \
+    rm -rf /wheels
 # Install Python packages from wheels produced in the builder stage
 COPY --from=builder /wheels /wheels
 RUN set -eux; \
@@ -68,6 +75,7 @@ RUN mkdir -p /var/lib/letsencrypt && \
 COPY certbot-azure.sh /usr/local/bin/certbot-azure.sh
 RUN chmod +x /usr/local/bin/certbot-azure.sh
 
+# Keep running as root for the entrypoint which can chown mounts; entrypoint will drop privileges
 # Install su-exec (small tool to drop privileges cleanly) and copy entrypoint
 RUN set -eux; \
     # su-exec is available in Alpine; ensure package repo updated earlier

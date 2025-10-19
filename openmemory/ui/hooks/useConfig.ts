@@ -33,7 +33,7 @@ export const useConfig = (): UseConfigApiReturn => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const dispatch = useDispatch<AppDispatch>();
-  const URL = process.env.NEXT_PUBLIC_API_URL || 'https://mem0-api.jollybush-836e15bc.westus3.azurecontainerapps.io';
+  const URL = process.env.NEXT_PUBLIC_API_URL || 'https://mem0-api.compliance-theater.obapps.net';
 
   const fetchConfig = async () => {
     setIsLoading(true);

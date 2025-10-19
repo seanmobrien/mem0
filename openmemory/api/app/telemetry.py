@@ -8,8 +8,8 @@ import socket
 from typing import Optional
 
 from opentelemetry import trace
-from opentelemetry.trace import Tracer
 from opentelemetry.sdk.resources import Resource
+from opentelemetry.trace import Tracer
 
 _logger = logging.getLogger(__name__)
 _configured = False
@@ -49,9 +49,9 @@ def init_telemetry(connection_string: str, sampling_ratio: Optional[float] = Non
     resource = Resource.create(
         {
             "service.name": "Mem0-Api",
-            "service.instance.id": f"ObApps.ComplianceTheatre.Mem0-Api.{instance_id}",
-            "service.namespace": "ObApps.ComplianceTheatre",
-            "ai.cloud.roleBaseName": "mem0-api.jollybush-836e15bc.westus3.azurecontainerapps.io",
+            "service.instance.id": f"ObApps.ComplianceTheatre-Mem0-Api-{instance_id}",
+            "service.namespace": "mem0-api.compliance-theater.obapps.net",
+            "ai.cloud.roleBaseName": "mem0-api.compliance-theater.obapps.net",
         }
     )
 

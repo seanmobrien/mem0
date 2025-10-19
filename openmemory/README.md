@@ -101,6 +101,13 @@ pnpm dev
 
 - `api/` - Backend APIs + MCP server
 - `ui/` - Frontend React application
+- `certbot-azure/` - Let's Encrypt certificate manager with deSEC DNS challenge and Azure Key Vault integration
+
+### Certificate Management (certbot-azure)
+
+The `certbot-azure` directory contains a Docker container for automated SSL/TLS certificate management using Let's Encrypt, deSEC DNS challenge, and Azure Key Vault integration. This is useful for securing your OpenMemory deployment with valid SSL certificates.
+
+See [certbot-azure/README.md](certbot-azure/README.md) for detailed usage instructions.
 
 ## Azure Deployment
 

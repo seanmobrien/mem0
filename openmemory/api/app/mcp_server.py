@@ -37,18 +37,30 @@ from app.utils.memory import get_memory_client
 from fastapi import FastAPI, HTTPException, Request, Depends
 from fastapi.routing import APIRouter
 import contextvars
-import os
-from dotenv import load_dotenv
-from app.database import SessionLocal
-from app.models import Memory, MemoryState, MemoryStatusHistory, MemoryAccessLog, User
-from app.utils.db import get_user_and_app
-from app.auth import get_user_record, require_user_role
-import uuid
 import datetime
+import json
+import logging
+import uuid
+from typing import Any, Dict, List, Mapping, Union
+
+from app.auth import get_user_record
+from app.database import SessionLocal
+from app.models import Memory, MemoryAccessLog, MemoryState, MemoryStatusHistory, User
+from app.utils.db import get_user_and_app
+from app.utils.memory import get_memory_client
+from app.utils.memory_client import log_memory_access, search_memories
 from app.utils.permissions import check_memory_access_permissions
-from app.utils.memory_client import search_memories, log_memory_access
+from app.utils.telemetry import (
+    _attach_trace_context_from_request,
+    _detach_trace_context,
+    _record_exception,
+)
+from dotenv import load_dotenv
+from mcp.server.fastmcp import FastMCP
+from mcp.server.sse import SseServerTransport
+from opentelemetry import trace
+from opentelemetry.trace import SpanKind
 from qdrant_client import models as qdrant_models
-from typing import Union
 
 # Load environment variables
 load_dotenv()
@@ -610,7 +622,7 @@ async def handle_post_message(request: Request):
 
 def setup_mcp_server(app: FastAPI):
     """Setup MCP server with the FastAPI application"""
-    mcp._mcp_server.name = f"mem0-mcp-server"
+    mcp._mcp_server.name = "mem0-mcp-server"
 
     # Include MCP router in the FastAPI app
     app.include_router(mcp_router)

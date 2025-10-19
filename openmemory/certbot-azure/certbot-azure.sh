@@ -328,7 +328,7 @@ export_certificates() {
     log_info "Exporting certificates to /mnt/secrets-output"
     
     # Determine certificate path
-    local cert_path="/live/$DOMAIN"
+    local cert_path="/etc/letsencrypt/live/$DOMAIN"
     
     if [ ! -d "$cert_path" ]; then
         log_error "Certificate directory not found: $cert_path"

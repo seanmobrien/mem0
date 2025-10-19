@@ -110,7 +110,7 @@ STAGING="${12:-${CERTMGR_STAGING:-false}}"
 DNS_PROVIDER="${13:-${CERTMGR_DNS_PROVIDER:-auto}}"
 
 echo "=== Certbot Azure Certificate Manager configuration ==="
-echo "Domain: $CERTMGR_DOMAIN"
+echo "Domain: $DOMAIN"
 echo "Email: $EMAIL"
 echo "deSEC Token: [Secret Hidden]"
 echo "Cloudflare Email: $CLOUDFLARE_EMAIL"
@@ -257,7 +257,7 @@ validate_provider_credentials() {
                 log_error "deSEC provider selected but CERTMGR_DESEC_TOKEN is not set"
                 error_exit
             fi
-             local desec_creds="/etc/letsencrypt/$DOMAIN/desec-credentials.ini"
+             desec_creds="/etc/letsencrypt/$DOMAIN/desec-credentials.ini"
             cat > "$desec_creds" <<EOF
 dns_desec_token = $DESEC_TOKEN
 EOF
@@ -270,7 +270,7 @@ EOF
                 log_error "Cloudflare provider selected but CERTMGR_CLOUDFLARE_TOKEN is not set"
                 error_exit
             fi
-                local certbot_creds="/etc/letsencrypt/$DOMAIN/certbot-credentials.ini"
+                certbot_creds="/etc/letsencrypt/$DOMAIN/certbot-credentials.ini"
                 cat > "$certbot_creds" <<EOF
 dns_cloudflare_email = $CLOUDFLARE_EMAIL
 dns_cloudflare_api_token = $CLOUDFLARE_TOKEN

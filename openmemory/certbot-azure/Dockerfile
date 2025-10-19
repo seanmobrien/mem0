@@ -50,12 +50,6 @@ RUN set -eux; \
     # install from local wheels to avoid network and compilation in final image
     python3 -m pip install --no-cache-dir /wheels/*.whl; \
     rm -rf /wheels
-# Install Python packages from wheels produced in the builder stage
-COPY --from=builder /wheels /wheels
-RUN set -eux; \
-    # install from local wheels to avoid network and compilation in final image
-    python3 -m pip install --no-cache-dir /wheels/*.whl; \
-    rm -rf /wheels
 
 # Create non-root user for running the application
 RUN addgroup -g 1000 certbot-user && \
@@ -75,7 +69,6 @@ RUN mkdir -p /var/lib/letsencrypt && \
 COPY certbot-azure.sh /usr/local/bin/certbot-azure.sh
 RUN chmod +x /usr/local/bin/certbot-azure.sh
 
-# Keep running as root for the entrypoint which can chown mounts; entrypoint will drop privileges
 # Install su-exec (small tool to drop privileges cleanly) and copy entrypoint
 RUN set -eux; \
     # su-exec is available in Alpine; ensure package repo updated earlier

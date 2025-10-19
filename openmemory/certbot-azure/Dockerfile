@@ -23,7 +23,7 @@ RUN set -eux; \
     retry apk add --no-cache build-base gcc musl-dev libffi-dev python3-dev libffi; \
     mkdir -p /wheels; \
     # build wheels for our Python dependencies (include Cloudflare python lib)
-    retry python3 -m pip wheel --no-cache-dir --wheel-dir /wheels certbot-dns-desec certbot-dns-cloudflare==latest cloudflare==latest certbot-dns-freedns azure-cli; \
+    retry python3 -m pip wheel --no-cache-dir --wheel-dir /wheels certbot-dns-desec certbot-dns-cloudflare==1.1.0 cloudflare==2.3.1  certbot-dns-freedns azure-cli; \
     # clean up build deps in builder (keeps builder small)
     apk del build-base gcc musl-dev libffi-dev python3-dev || true
 

@@ -56,8 +56,6 @@ from app.utils.telemetry import (
     _record_exception,
 )
 from dotenv import load_dotenv
-from fastapi import Depends, FastAPI, Request
-from fastapi.routing import APIRouter
 from mcp.server.fastmcp import FastMCP
 from mcp.server.sse import SseServerTransport
 from opentelemetry import trace

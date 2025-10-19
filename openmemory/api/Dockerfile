@@ -41,6 +41,8 @@ WORKDIR /usr/src/openmemory
 
 # Install runtime dependencies
 RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+# Ensure pip/setuptools/wheel are present so pkg_resources is available at runtime
+RUN python -m pip install --upgrade pip setuptools wheel
 
 # Copy the built mem0ai package from builder stage
 COPY --from=builder --link=true /src/mem0/dist/*.whl /tmp/

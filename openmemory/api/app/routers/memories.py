@@ -3,6 +3,8 @@ from typing import List, Optional, Set, Union
 from uuid import UUID, uuid4
 import logging
 import os
+from functools import wraps
+from fastapi import Request
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, joinedload
 from fastapi_pagination import Page, Params
@@ -21,8 +23,69 @@ from app.models import (
 from app.schemas import MemoryResponse, PaginatedMemoryResponse
 from app.utils.permissions import check_memory_access_permissions
 from app.auth import get_current_user, get_user_id, get_user_record
+from opentelemetry import trace
+from opentelemetry.trace import SpanKind, Status, StatusCode
 
 router = APIRouter(prefix="/api/v1/memories", tags=["memories"])
+
+_TRACER = trace.get_tracer("mem0.api.memories")
+
+
+def _record_exception(span, exc: Exception) -> None:
+    span.record_exception(exc)
+    span.set_status(Status(StatusCode.ERROR, str(exc)))
+
+
+def traced_endpoint(span_name: str):
+    def decorator(func):
+        @wraps(func)
+        async def wrapper(*args, **kwargs):
+            with _TRACER.start_as_current_span(span_name, kind=SpanKind.SERVER) as span:
+                try:
+                    # Try to enrich span with common attributes from args/kwargs
+                    # user (dependency) is commonly passed as 'user'
+                    user = kwargs.get("user")
+                    if not user:
+                        # search positional args for a user-like object (has user_id)
+                        for a in args:
+                            if hasattr(a, "user_id"):
+                                user = a
+                                break
+                    if user and hasattr(user, "user_id"):
+                        span.set_attribute("mem0.user_id", getattr(user, "user_id"))
+
+                    # app_id or app parameter
+                    app_id = kwargs.get("app_id") or kwargs.get("app")
+                    if not app_id and "request" in kwargs and hasattr(kwargs["request"], "path_params"):
+                        # try to derive from path params
+                        path_params = getattr(kwargs["request"], "path_params", {})
+                        if "app_id" in path_params:
+                            app_id = path_params["app_id"]
+                    if app_id:
+                        span.set_attribute("mem0.app_id", str(app_id))
+
+                    # If Request present, add route details
+                    request = kwargs.get("request")
+                    if not request:
+                        for a in args:
+                            if isinstance(a, Request):
+                                request = a
+                                break
+                    if request:
+                        try:
+                            span.set_attribute("http.method", request.method)
+                            span.set_attribute("http.target", str(getattr(request, "url", "")))
+                        except Exception:
+                            pass
+
+                    return await func(*args, **kwargs)
+                except Exception as exc:
+                    _record_exception(span, exc)
+                    raise
+
+        return wrapper
+
+    return decorator
 
 
 def get_memory_or_404(db: Session, memory_id: UUID, user: User) -> Memory:
@@ -97,6 +160,7 @@ def get_accessible_memory_ids(db: Session, app_id: UUID, user: User) -> Set[UUID
 
 # List all memories with filtering
 @router.get("/", response_model=Page[MemoryResponse])
+@traced_endpoint("memories.list")
 async def list_memories(
     app_id: Optional[UUID] = None,
     from_date: Optional[int] = Query(
@@ -117,6 +181,12 @@ async def list_memories(
     db: Session = Depends(get_db),
     user: User = Depends(get_user_record)
 ):
+    span = trace.get_current_span()
+    span.set_attribute("mem0.user_id", user.user_id)
+    if app_id:
+        span.set_attribute("mem0.app_id", str(app_id))
+    if search_query:
+        span.set_attribute("mem0.search_query", search_query)
     # Build base query
     query = db.query(Memory).filter(
         Memory.user_id == user.id,
@@ -171,10 +241,13 @@ async def list_memories(
 
 # Get all categories
 @router.get("/categories")
+@traced_endpoint("memories.categories")
 async def get_categories(
     db: Session = Depends(get_db),
     user: User = Depends(get_user_record)
 ):    
+    span = trace.get_current_span()
+    span.set_attribute("mem0.user_id", user.user_id)
     
     # Get unique categories associated with the user's memories
     # Get all memories
@@ -199,11 +272,15 @@ class CreateMemoryRequest(BaseModel):
 
 # Create new memory
 @router.post("/")
+@traced_endpoint("memories.create")
 async def create_memory(
     request: CreateMemoryRequest,
     db: Session = Depends(get_db),
     user: User = Depends(get_user_record)
 ):
+    span = trace.get_current_span()
+    span.set_attribute("mem0.user_id", user.user_id)
+    span.set_attribute("mem0.app_name", request.app)
     # Get or create app
     app_obj = db.query(App).filter(App.name == request.app,
                                    App.owner_id == user.id).first()
@@ -291,11 +368,15 @@ async def create_memory(
 
 # Get memory by ID
 @router.get("/{memory_id}")
+@traced_endpoint("memories.get")
 async def get_memory(
     memory_id: UUID,
     db: Session = Depends(get_db),
     user: User = Depends(get_user_record)
 ):
+    span = trace.get_current_span()
+    span.set_attribute("mem0.user_id", user.user_id)
+    span.set_attribute("mem0.memory_id", str(memory_id))
     memory = get_memory_or_404(db, memory_id, user)
     return {
         "id": memory.id,
@@ -315,11 +396,15 @@ class DeleteMemoriesRequest(BaseModel):
 
 # Delete multiple memories
 @router.delete("/")
+@traced_endpoint("memories.delete")
 async def delete_memories(
     request: DeleteMemoriesRequest,
     db: Session = Depends(get_db),
     user: User = Depends(get_user_record)
 ):
+    span = trace.get_current_span()
+    span.set_attribute("mem0.user_id", user.user_id)
+    span.set_attribute("mem0.deleted_count", len(request.memory_ids))
     for memory_id in request.memory_ids:
         update_memory_state(db, memory_id, MemoryState.deleted, user)
     return {"message": f"Successfully deleted {len(request.memory_ids)} memories"}
@@ -327,11 +412,15 @@ async def delete_memories(
 
 # Archive memories
 @router.post("/actions/archive")
+@traced_endpoint("memories.archive")
 async def archive_memories(
     memory_ids: List[UUID],
     db: Session = Depends(get_db),
     user: User = Depends(get_user_record)
 ):    
+    span = trace.get_current_span()
+    span.set_attribute("mem0.user_id", user.user_id)
+    span.set_attribute("mem0.archive_count", len(memory_ids))
     for memory_id in memory_ids:
         update_memory_state(db, memory_id, MemoryState.archived, user)
     return {"message": f"Successfully archived {len(memory_ids)} memories"}
@@ -347,11 +436,21 @@ class PauseMemoriesRequest(BaseModel):
 
 # Pause access to memories
 @router.post("/actions/pause")
+@traced_endpoint("memories.pause")
 async def pause_memories(
     request: PauseMemoriesRequest,
     db: Session = Depends(get_db),
     user: User = Depends(get_user_record)
 ):
+    span = trace.get_current_span()
+    span.set_attribute("mem0.user_id", user.user_id)
+    span.set_attribute("mem0.global_pause", request.global_pause)
+    if request.app_id:
+        span.set_attribute("mem0.app_id", str(request.app_id))
+    if request.memory_ids:
+        span.set_attribute("mem0.memory_count", len(request.memory_ids))
+    if request.category_ids:
+        span.set_attribute("mem0.category_count", len(request.category_ids))
     user_id = user.id
 
     global_pause = request.global_pause
@@ -417,6 +516,7 @@ async def pause_memories(
 
 # Get memory access logs
 @router.get("/{memory_id}/access-log")
+@traced_endpoint("memories.access_log")
 async def get_memory_access_log(
     memory_id: UUID,
     page: int = Query(1, ge=1),
@@ -424,6 +524,11 @@ async def get_memory_access_log(
     db: Session = Depends(get_db),
     user: User = Depends(get_user_record)
 ):    
+    span = trace.get_current_span()
+    span.set_attribute("mem0.user_id", user.user_id)
+    span.set_attribute("mem0.memory_id", str(memory_id))
+    span.set_attribute("mem0.page", page)
+    span.set_attribute("mem0.page_size", page_size)
     query = db.query(MemoryAccessLog).filter(MemoryAccessLog.memory_id == memory_id)
     total = query.count()
     logs = query.order_by(MemoryAccessLog.accessed_at.desc()).offset((page - 1) * page_size).limit(page_size).all()
@@ -446,12 +551,17 @@ class UpdateMemoryRequest(BaseModel):
 
 # Update a memory
 @router.put("/{memory_id}")
+@traced_endpoint("memories.update")
 async def update_memory(
     memory_id: UUID,
     request: UpdateMemoryRequest,
     db: Session = Depends(get_db),
     user: User = Depends(get_user_record)
 ):        
+    span = trace.get_current_span()
+    span.set_attribute("mem0.user_id", user.user_id)
+    span.set_attribute("mem0.memory_id", str(memory_id))
+    span.set_attribute("mem0.content_length", len(request.memory_content or ""))
     memory = get_memory_or_404(db, memory_id, user)
     memory.content = request.memory_content
     db.commit()
@@ -471,11 +581,18 @@ class FilterMemoriesRequest(BaseModel):
     show_archived: Optional[bool] = False
 
 @router.post("/filter", response_model=Page[MemoryResponse])
+@traced_endpoint("memories.filter")
 async def filter_memories(
     request: FilterMemoriesRequest,
     db: Session = Depends(get_db),
     user: User = Depends(get_user_record)
 ):
+    span = trace.get_current_span()
+    span.set_attribute("mem0.user_id", user.user_id)
+    span.set_attribute("mem0.page", request.page)
+    span.set_attribute("mem0.page_size", request.size)
+    if request.search_query:
+        span.set_attribute("mem0.search_query", request.search_query)
     user_id = user.id
     # Build base query
     query = db.query(Memory).filter(
@@ -571,6 +688,7 @@ class SearchMemoriesRequest(BaseModel):
 
 # Search memories endpoint
 @router.post("/search")
+@traced_endpoint("memories.search")
 async def search_memories_endpoint(
     request: SearchMemoriesRequest,
     db: Session = Depends(get_db),
@@ -586,6 +704,12 @@ async def search_memories_endpoint(
     # Default app for API requests
     app_id = "openmemory"
     
+    span = trace.get_current_span()
+    span.set_attribute("mem0.user_id", user.user_id)
+    span.set_attribute("mem0.query", request.query)
+    span.set_attribute("mem0.page", request.page)
+    span.set_attribute("mem0.limit", request.numberOfHits)
+
     try:
         # Use the reusable search function
         memories = await search_memories(
@@ -618,12 +742,16 @@ async def search_memories_endpoint(
 
 
 @router.get("/{memory_id}/related", response_model=Page[MemoryResponse])
+@traced_endpoint("memories.related")
 async def get_related_memories(
     memory_id: UUID,
     params: Params = Depends(),
     db: Session = Depends(get_db),
     user: User = Depends(get_user_record)
 ):
+    span = trace.get_current_span()
+    span.set_attribute("mem0.user_id", user.user_id)
+    span.set_attribute("mem0.memory_id", str(memory_id))
     user_id = user.user_id
 
     # Get the source memory

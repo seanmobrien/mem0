@@ -96,7 +96,82 @@ class VectorStoreFactory:
             if not isinstance(config, dict):
                 config = config.model_dump()
             vector_store_instance = load_class(class_type)
-            return vector_store_instance(**config)
+            instance = vector_store_instance(**config)
+
+            # Instrument provider-level search if OpenTelemetry is available
+            try:
+                from opentelemetry import trace
+                tracer = trace.get_tracer("mem0.vector_store")
+
+                if hasattr(instance, "search"):
+                    import inspect
+
+                    original_search = instance.search
+
+                    # Async provider support
+                    if inspect.iscoroutinefunction(getattr(original_search, '__func__', original_search)):
+                        async def _wrapped_search(*args, **kwargs):
+                            with tracer.start_as_current_span("vector_store.provider_search") as span:
+                                try:
+                                    span.set_attribute("mem0.vector_provider", instance.__class__.__name__)
+                                    if len(args) > 0:
+                                        span.set_attribute("mem0.search.query", str(args[0]))
+                                    if "limit" in kwargs:
+                                        try:
+                                            span.set_attribute("mem0.search.limit", int(kwargs.get("limit")))
+                                        except Exception:
+                                            pass
+                                    if "filters" in kwargs:
+                                        span.set_attribute("mem0.search.filters_present", bool(kwargs.get("filters")))
+                                    result = await original_search(*args, **kwargs)
+                                    try:
+                                        span.set_attribute("mem0.search.results_count", len(result) if result is not None else 0)
+                                    except Exception:
+                                        pass
+                                    return result
+                                except Exception as e:
+                                    try:
+                                        span.record_exception(e)
+                                    except Exception:
+                                        pass
+                                    raise
+
+                        instance.search = _wrapped_search
+                    else:
+                        def _wrapped_search(*args, **kwargs):
+                            with tracer.start_as_current_span("vector_store.provider_search") as span:
+                                try:
+                                    span.set_attribute("mem0.vector_provider", instance.__class__.__name__)
+                                    # capture commonly passed params if available
+                                    if len(args) > 0:
+                                        span.set_attribute("mem0.search.query", str(args[0]))
+                                    if "limit" in kwargs:
+                                        try:
+                                            span.set_attribute("mem0.search.limit", int(kwargs.get("limit")))
+                                        except Exception:
+                                            pass
+                                    if "filters" in kwargs:
+                                        span.set_attribute("mem0.search.filters_present", bool(kwargs.get("filters")))
+                                    result = original_search(*args, **kwargs)
+                                    try:
+                                        # try to capture result count
+                                        span.set_attribute("mem0.search.results_count", len(result) if result is not None else 0)
+                                    except Exception:
+                                        pass
+                                    return result
+                                except Exception as e:
+                                    try:
+                                        span.record_exception(e)
+                                    except Exception:
+                                        pass
+                                    raise
+
+                        instance.search = _wrapped_search
+            except Exception:
+                # opentelemetry not present or instrumentation failed — ignore
+                pass
+
+            return instance
         else:
             raise ValueError(f"Unsupported VectorStore provider: {provider_name}")
 

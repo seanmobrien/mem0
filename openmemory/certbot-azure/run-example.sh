@@ -25,10 +25,12 @@ echo "Starting certbot-azure container..."
 
 # Run the container
 docker run --rm \
+    -it \
     -v "$CERTS_DIR:/mnt/secrets-output" \
     -e CERTMGR_DOMAIN="$CERTMGR_DOMAIN" \
     -e CERTMGR_EMAIL="$CERTMGR_EMAIL" \
     -e CERTMGR_DESEC_TOKEN="$CERTMGR_DESEC_TOKEN" \
+    -e CERTMGR_CLOUDFLARE_EMAIL="$CERTMGR_CLOUDFLARE_EMAIL" \
     -e CERTMGR_CLOUDFLARE_TOKEN="$CERTMGR_CLOUDFLARE_TOKEN" \
     -e CERTMGR_DNS_PROVIDER="${CERTMGR_DNS_PROVIDER:-auto}" \
     -e CERTMGR_AZURE_TENANT_ID="$CERTMGR_AZURE_TENANT_ID" \

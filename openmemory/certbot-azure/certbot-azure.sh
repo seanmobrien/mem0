@@ -4,18 +4,66 @@ set -euo pipefail
 run_keepalive() {
   set -euo pipefail
   trap 'echo "SIGTERM received, exiting"; exit 0' TERM INT
-  echo "Startup tasks completed; entering keepalive - press Ctrl-X to exit"
-# Read from the TTY so Ctrl+X can be detected even when stdin is redirected
-while true; do    
-    # wait up to 15s for a single keypress; -s silent, -n1 one char, -t timeout
-    if read -rsn1 -t 15 key < /dev/tty; then
-        # Ctrl-X is ASCII 0x18
-        if [[ $key == $'\x18' ]]; then
-            echo "Ctrl-X received, exiting"
-            break
-        fi
+  # timeout in seconds; default to 3600 (1 hour) unless overridden
+  CERTMGR_KEEPALIVE_TIMEOUT=${CERTMGR_KEEPALIVE_TIMEOUT:-3600}
+  log_info "Startup tasks completed; entering keepalive (timeout=${CERTMGR_KEEPALIVE_TIMEOUT}s) - press Ctrl-X to exit"
+
+  local start_ts now elapsed
+  # use SECONDS bash builtin for portable elapsed timing
+  start_ts=$SECONDS
+
+  # Read from the TTY so Ctrl-X can be detected even when stdin is redirected
+  while true; do
+    # Check timeout
+    now=$SECONDS
+    elapsed=$(( now - start_ts ))
+    if [ "$elapsed" -ge "$CERTMGR_KEEPALIVE_TIMEOUT" ]; then
+      log_info "Keepalive timeout reached (${elapsed}s >= ${CERTMGR_KEEPALIVE_TIMEOUT}s); exiting"
+      break
     fi
-done
+
+    # Determine TTY availability once by trying to open /dev/tty for reading into fd 3
+    if [ -z "${_KEEPALIVE_TTY_CHECKED:-}" ]; then
+        if exec 3</dev/tty 2>/dev/null; then
+            KEEPALIVE_HAS_TTY=1
+            KEEPALIVE_TTY_FD=3
+            log_info "TTY detected and accessible; waiting for Ctrl-X"
+        else
+            KEEPALIVE_HAS_TTY=0
+            KEEPALIVE_TTY_FD=""
+            log_info "No usable TTY detected; falling back to sleep-only keepalive"
+        fi
+        _KEEPALIVE_TTY_CHECKED=1
+    fi
+
+    if [ "${KEEPALIVE_HAS_TTY:-0}" -eq 1 ]; then
+        # wait up to 15s for a single keypress; -s silent, -n1 one char, -t timeout
+        # but never wait beyond the keepalive timeout remaining
+        remaining=$(( CERTMGR_KEEPALIVE_TIMEOUT - elapsed ))
+        if [ "$remaining" -le 0 ]; then
+            # timeout reached in the middle of loop
+            continue
+        fi
+        if [ "$remaining" -lt 15 ]; then
+            rt="$remaining"
+        else
+            rt=15
+        fi
+        # read from the already-opened fd using bash's -u flag to avoid opening /dev/tty
+        if read -u "$KEEPALIVE_TTY_FD" -rsn1 -t "$rt" key 2>/dev/null; then
+            # Ctrl-X is ASCII 0x18
+            if [[ $key == $'\\x18' ]]; then
+                echo "Ctrl-X received, exiting"
+                # close fd before exit
+                exec {KEEPALIVE_TTY_FD}<&- 2>/dev/null || true
+                break
+            fi
+        fi
+    else
+        # No TTY: sleep in short increments so signals are handled promptly
+        sleep 15
+    fi
+  done
 }
 
 error_exit() {    
@@ -46,23 +94,27 @@ trap 'on_error $LINENO' ERR
 DOMAIN="${1:-${CERTMGR_DOMAIN}}"
 EMAIL="${2:-${CERTMGR_EMAIL}}"
 DESEC_TOKEN="${3:-${CERTMGR_DESEC_TOKEN}}"
-CERTMGR_CLOUDFLARE_TOKEN="${CERTMGR_CLOUDFLARE_TOKEN}"
+CLOUDFLARE_EMAIL="${4:-${CERTMGR_CLOUDFLARE_EMAIL}}"
+CLOUDFLARE_TOKEN="${5:-${CERTMGR_CLOUDFLARE_TOKEN}}"
 
-# Azure configuration  
-AZURE_TENANT_ID="${4:-${CERTMGR_AZURE_TENANT_ID}}"
-AZURE_CLIENT_ID="${5:-${CERTMGR_AZURE_CLIENT_ID}}"
-AZURE_CLIENT_SECRET="${6:-${CERTMGR_AZURE_CLIENT_SECRET}}"
-AZURE_KEYVAULT_NAME="${7:-${CERTMGR_AZURE_KEYVAULT_NAME}}"
-AZURE_CERT_NAME="${8:-${CERTMGR_AZURE_CERT_NAME}}"
+# Azure configuration
+AZURE_TENANT_ID="${6:-${CERTMGR_AZURE_TENANT_ID}}"
+AZURE_CLIENT_ID="${7:-${CERTMGR_AZURE_CLIENT_ID}}"
+AZURE_CLIENT_SECRET="${8:-${CERTMGR_AZURE_CLIENT_SECRET}}"
+AZURE_KEYVAULT_NAME="${9:-${CERTMGR_AZURE_KEYVAULT_NAME}}"
+AZURE_CERT_NAME="${10:-${CERTMGR_AZURE_CERT_NAME}}"
 
 # Optional configuration
-RENEWAL_MODE="${9:-${CERTMGR_RENEWAL_MODE:-false}}"
-STAGING="${10:-${CERTMGR_STAGING:-false}}"
+RENEWAL_MODE="${11:-${CERTMGR_RENEWAL_MODE:-false}}"
+STAGING="${12:-${CERTMGR_STAGING:-false}}"
+DNS_PROVIDER="${13:-${CERTMGR_DNS_PROVIDER:-auto}}"
 
 echo "=== Certbot Azure Certificate Manager configuration ==="
 echo "Domain: $CERTMGR_DOMAIN"
 echo "Email: $EMAIL"
 echo "deSEC Token: [Secret Hidden]"
+echo "Cloudflare Email: $CLOUDFLARE_EMAIL"
+echo "Cloudflare Token: [Secret Hidden]"
 echo "Azure Tenant ID: $AZURE_TENANT_ID"
 echo "Azure Client ID: $AZURE_CLIENT_ID"
 echo "Azure Client Secret: [Secret Hidden]"
@@ -71,6 +123,7 @@ echo "Certificate Name: $AZURE_CERT_NAME"
 echo "Renewal Mode: $RENEWAL_MODE"
 echo "Staging: $STAGING"
 echo "Keepalive: ${CERTMGR_KEEPALIVE:-false}"
+echo "DNS Provider: $DNS_PROVIDER"
 
 # ============================================================================
 # Helper Functions
@@ -196,6 +249,7 @@ detect_dns_provider() {
 
 validate_provider_credentials() {
     log_info "Validating credentials for DNS provider: $DNS_PROVIDER"
+    mkdir -p "/etc/letsencrypt/$DOMAIN"
     
     case "$DNS_PROVIDER" in
         desec)
@@ -203,6 +257,12 @@ validate_provider_credentials() {
                 log_error "deSEC provider selected but CERTMGR_DESEC_TOKEN is not set"
                 error_exit
             fi
+             local desec_creds="/etc/letsencrypt/$DOMAIN/desec-credentials.ini"
+            cat > "$desec_creds" <<EOF
+dns_desec_token = $DESEC_TOKEN
+EOF
+            chmod 600 "$desec_creds"
+            dns_args="--authenticator dns-desec --dns-desec-credentials $desec_creds --dns-desec-propagation-seconds 60"
             log_success "deSEC credentials validated"
             ;;
         cloudflare)
@@ -210,6 +270,13 @@ validate_provider_credentials() {
                 log_error "Cloudflare provider selected but CERTMGR_CLOUDFLARE_TOKEN is not set"
                 error_exit
             fi
+                local certbot_creds="/etc/letsencrypt/$DOMAIN/certbot-credentials.ini"
+                cat > "$certbot_creds" <<EOF
+dns_cloudflare_email = $CLOUDFLARE_EMAIL
+dns_cloudflare_api_key = $CLOUDFLARE_TOKEN
+EOF
+            chmod 600 "$certbot_creds"
+            dns_args="--dns-cloudflare --dns-cloudflare-credentials $certbot_creds --dns-cloudflare-propagation-seconds 60"
             log_success "Cloudflare credentials validated"
             ;;
         *)
@@ -225,30 +292,20 @@ validate_provider_credentials() {
 
 request_certificate() {
     log_info "Starting certificate request for domain: $DOMAIN"    
-    # Create deSEC credentials file
-    mkdir -p "/etc/letsencrypt/$DOMAIN"
-    local desec_creds="/etc/letsencrypt/$DOMAIN/desec-credentials.ini"
-    cat > "$desec_creds" <<EOF
-dns_desec_token = $DESEC_TOKEN
-EOF
-    chmod 600 "$desec_creds"
-    
+
     # Build certbot command
     local certbot_cmd="certbot certonly -v"
-    certbot_cmd="$certbot_cmd --authenticator dns-desec"
-    certbot_cmd="$certbot_cmd --dns-desec-credentials $desec_creds"
-    certbot_cmd="$certbot_cmd --dns-desec-propagation-seconds 60"
-    certbot_cmd="$certbot_cmd --non-interactive"
-    certbot_cmd="$certbot_cmd --agree-tos"
-    certbot_cmd="$certbot_cmd --email $EMAIL"
-    certbot_cmd="$certbot_cmd --domain $DOMAIN"
-    
-    # Add staging flag if requested
     if [ "$STAGING" = "true" ]; then
         log_info "Using Let's Encrypt staging environment"
         certbot_cmd="$certbot_cmd --staging"
     fi
-    
+
+    certbot_cmd="$certbot_cmd $dns_args"
+    certbot_cmd="$certbot_cmd --non-interactive"
+    certbot_cmd="$certbot_cmd --agree-tos"
+    certbot_cmd="$certbot_cmd --email $EMAIL"
+    certbot_cmd="$certbot_cmd --domain $DOMAIN"
+
     # Add force renewal flag if in renewal mode
     if [ "$RENEWAL_MODE" = "true" ]; then
         log_info "Running in renewal mode"
@@ -258,15 +315,13 @@ EOF
     # Execute certbot
     log_info "Executing certbot command..."
     if eval "$certbot_cmd"; then
+        rm -f "/etc/letsencrypt/$DOMAIN/*.ini"
         log_success "Certificate obtained successfully"
     else
+        rm -f "/etc/letsencrypt/$DOMAIN/*.ini"
         log_error "Failed to obtain certificate"
-        rm -f "$desec_creds"
         error_exit
-    fi
-    
-    # Clean up credentials file
-    [ -n "$creds_file" ] && rm -f "$creds_file"
+    fi    
 }
 
 export_certificates() {

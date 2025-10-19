@@ -1,7 +1,7 @@
 ARG FLAGSMITH_TAG=latest
-ARG LOG_LVL=INFO
-ARG ALLOWED_HOSTS="flags.jollybush-836e15bc.westus3.azurecontainerapps.io"
-ARG CSRF_TRUSTED_ORIGINS="login.jollybush-836e15bc.westus3.azurecontainerapps.io,mem0-api.jollybush-836e15bc.westus3.azurecontainerapps.io,mem0-ui.jollybush-836e15bc.westus3.azurecontainerapps.io,web-ui.jollybush-836e15bc.westus3.azurecontainerapps.io"
+ARG LOG_LVL=ERROR
+ARG ALLOWED_HOSTS="flags.obapps.net"
+ARG CSRF_TRUSTED_ORIGINS="login.obapps.net,mem0-api.compliance-theater.obapps.net,mem0-ui.compliance-theater.obapps.net,full-ui.compliance-theater.obapps.net"
 
 FROM docker.flagsmith.com/flagsmith/flagsmith:${FLAGSMITH_TAG}
 

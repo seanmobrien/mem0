@@ -19,9 +19,9 @@ if [[ -n "${PFX_PASS:-}" && -n "${KEY_NAME:-}" ]]; then
     # Download and extract certificate from Azure Key Vault
     CERT="$CERT_DIR/bolt"
     az keyvault secret download --vault-name "${KEY_VAULT_NAME}" --name "${KEY_NAME}" --file "$CERT.pfx" # > /dev/null 2>&1;
-    echo "Certificate succesfully downloaded - extracting..."
+    echo "Certificate successfully downloaded - extracting..."
     openssl pkcs12 -in "$CERT.pfx" -nocerts -nodes -passin pass:"${PFX_PASS}" -out "$CERT.key" \
-        & openssl pkcs12 -in "$CERT.pfx" -clcerts -nokeys -passin pass:"${PFX_PASS}" -out "$CERT.crt" # > /dev/null 2>&1;
+        && openssl pkcs12 -in "$CERT.pfx" -clcerts -nokeys -passin pass:"${PFX_PASS}" -out "$CERT.crt" # > /dev/null 2>&1;
     
     # Set appropriate permissions
     chmod 644 "$CERT_DIR/bolt.crt"
@@ -29,8 +29,8 @@ if [[ -n "${PFX_PASS:-}" && -n "${KEY_NAME:-}" ]]; then
     
 fi
 
-if [[ -n "${BOLT_CRT:-}" && -n "${BOLT_KEY:-}" && -f "${BOLT_CRT}" && -f "${BOLT_KEY}" ]]; then
-    echo "✅ Successfully extracted bolt certificate from $VAULT/$KEY_NAME"
+if [[ -f "$CERT_DIR/bolt.crt" && -f "$CERT_DIR/bolt.key" ]]; then
+    echo "✅ Successfully extracted bolt certificate from $KEY_VAULT_NAME/$KEY_NAME"
 else
     echo "BOLT_CRT and/or BOLT_KEY not found, generating self-signed certificate..."
     

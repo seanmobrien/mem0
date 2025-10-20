@@ -1,8 +1,12 @@
 FROM neo4j:5.26.13
 
-RUN pip install --no-cache-dir \
-    azure-cli \
-    azure-cli-keyvault
+RUN apt-get update && \
+    apt-get install -y ca-certificates curl apt-transport-https lsb-release gnupg && \
+    curl -sL https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor | tee /etc/apt/trusted.gpg.d/microsoft.gpg > /dev/null && \
+    echo "deb [arch=amd64] https://packages.microsoft.com/repos/azure-cli/ $(lsb_release -cs) main" | tee /etc/apt/sources.list.d/azure-cli.list && \
+    apt-get update && \
+    apt-get install -y azure-cli && \
+    rm -rf /var/lib/apt/lists/*
 
 COPY extension_script.sh /extension_script.sh
 ENV EXTENSION_SCRIPT=/extension_script.sh

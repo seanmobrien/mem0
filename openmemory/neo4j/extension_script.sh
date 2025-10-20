@@ -19,7 +19,7 @@ if [[ -n "${PFX_PASS:-}" && -n "${KEY_NAME:-}" ]]; then
     # Download and extract certificate from Azure Key Vault
     CERT="$CERT_DIR/bolt"
     az keyvault secret download --vault-name "${KEY_VAULT_NAME}" --name "${KEY_NAME}" --file "$CERT.pfx" # > /dev/null 2>&1;
-    echo "Certificate succesfully downloaded - extracting..."
+    echo "Certificate successfully downloaded - extracting..."
     openssl pkcs12 -in "$CERT.pfx" -nocerts -nodes -passin pass:"${PFX_PASS}" -out "$CERT.key" \
         & openssl pkcs12 -in "$CERT.pfx" -clcerts -nokeys -passin pass:"${PFX_PASS}" -out "$CERT.crt" # > /dev/null 2>&1;
     

@@ -1,4 +1,9 @@
-FROM neo4j:5.26.12
+FROM neo4j:5.26.13
+
+RUN pip install --no-cache-dir \
+    azure-cli \
+    azure-cli-keyvault
+
 COPY extension_script.sh /extension_script.sh
 ENV EXTENSION_SCRIPT=/extension_script.sh
 ENV NEO4J_PLUGINS='["apoc"]'
@@ -20,8 +25,8 @@ ENV NEO4J_server_memory_heap_max__size='6g'
 ENV NEO4J_server_jvm_additional='-XX:+ExitOnOutOfMemoryError'
 
 
-RUN mkdir /var/lib/neo4j/certificates/bolt && \
- mkdir /var/lib/neo4j/certificates/bolt/trusted && \
- mkdir /var/lib/neo4j/certificates/bolt/revoked
+RUN mkdir /var/lib/neo4j/certificates/bolt \
+    && mkdir /var/lib/neo4j/certificates/bolt/trusted \
+    && mkdir /var/lib/neo4j/certificates/bolt/revoked
 
 EXPOSE 7474 7687

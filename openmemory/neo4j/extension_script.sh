@@ -29,8 +29,8 @@ if [[ -n "${PFX_PASS:-}" && -n "${KEY_NAME:-}" ]]; then
     
 fi
 
-if [[ -n "${BOLT_CRT:-}" && -n "${BOLT_KEY:-}" && -f "${BOLT_CRT}" && -f "${BOLT_KEY}" ]]; then
-    echo "✅ Successfully extracted bolt certificate from $VAULT/$KEY_NAME"
+if [[ -f "$CERT_DIR/bolt.crt" && -f "$CERT_DIR/bolt.key" ]]; then
+    echo "✅ Successfully extracted bolt certificate from $KEY_VAULT_NAME/$KEY_NAME"
 else
     echo "BOLT_CRT and/or BOLT_KEY not found, generating self-signed certificate..."
     

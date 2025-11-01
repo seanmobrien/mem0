@@ -21,12 +21,12 @@ ENV NEO4J_dbms_ssl_policy_bolt_base__directory=certificates/bolt
 ENV NEO4J_dbms_ssl_policy_bolt_private__key=bolt.key
 ENV NEO4J_dbms_ssl_policy_bolt_public__certificate=bolt.crt
 #Memory
-ENV NEO4J_server_memory_heap_initial__size='500m'
-ENV NEO4J_server_memory_heap_max__size='3g'
-ENV NEO4J_server_memory_heap_max__size='6g'
+#ENV NEO4J_server_memory_heap_initial__size='500m'
+#ENV NEO4J_server_memory_heap_max__size='1500m'
+#ENV NEO4J_server_memory_pagecache_size='1g'
 
-#Additional Ops
-ENV NEO4J_server_jvm_additional='-XX:+ExitOnOutOfMemoryError'
+#Additional Ops 
+#ENV NEO4J_server_jvm_additional='-XX:+ExitOnOutOfMemoryError'
 
 
 RUN mkdir /var/lib/neo4j/certificates/bolt \

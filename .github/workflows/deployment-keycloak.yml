@@ -50,4 +50,5 @@ jobs:
           containerAppName: login
           containerAppEnvironment: ComplianceTheatre2000
           resourceGroup: SchoolLawyer
-          environmentVariables: KC_HOSTNAME=${{ vars.KC_HOSTNAME }} KC_LOG_LEVEL=INFO KC_DB_URL_DATABASE=${{ vars.KC_DB_URL_DATABASE }} KC_DB_USERNAME=keycloak_user KC_DB_URL_HOST=${{ vars.KC_DB_URL_HOST }} KC_DB_PASSWORD=secretRef:db-login-password KC_HTTP_ENABLED=true KC_HTTPS_PORT=8443 KEYCLOAK_ADMIN=dog KEYCLOAK_ADMIN_PASSWORD=secretRef:kc-admin-password KC_HTTP_PORT=8080 KC_PII_ENCKEY=secretRef:kc-pii-enckey
+          # Keeping environment variables stable until we have a release build
+          #environmentVariables: KC_HOSTNAME=${{ vars.KC_HOSTNAME }} KC_LOG_LEVEL=INFO KC_DB_URL_DATABASE=${{ vars.KC_DB_URL_DATABASE }} KC_DB_USERNAME=keycloak_user KC_DB_URL_HOST=${{ vars.KC_DB_URL_HOST }} KC_DB_PASSWORD=secretRef:db-login-password KC_HTTP_ENABLED=true KC_HTTPS_PORT=8443 KEYCLOAK_ADMIN=dog KEYCLOAK_ADMIN_PASSWORD=secretRef:kc-admin-password KC_HTTP_PORT=8080 KC_PII_ENCKEY=secretRef:kc-pii-enckey

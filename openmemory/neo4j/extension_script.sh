@@ -1,21 +1,24 @@
 #!/bin/bash
 set -euo pipefail
 
+
+# Create a directory for certificates if it doesn't exist
+
 echo "Setting up BOLT certificates..."
 # Create certificates directory if it doesn't exist
-CERT_DIR="/var/lib/neo4j/certificates/bolt"
+CERT_DIR="${CERT_DIR:-/var/lib/neo4j/certificates/bolt}"
 mkdir -p "$CERT_DIR"
 
 # Check if BOLT_CRT and BOLT_KEY environment variables are defined
 if [[ -n "${PFX_PASS:-}" && -n "${KEY_NAME:-}" ]]; then
     echo "Found KeyVault environment variables, downloading certificate..."
 
-# Log into azure using the system-assigned managed identity
+    # Log into azure using the system-assigned managed identity
     az login --identity
 
     KEY_VAULT_SCOPE="/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/${AZURE_RESOURCE_GROUP}/providers/Microsoft.KeyVault/vaults/${KEY_VAULT_NAME}/certificates/${KEY_NAME}"
     echo "Acquiring access token for Key Vault scope: $KEY_VAULT_SCOPE"
-    TOKEN=$(az account get-access-token --scope "$KEY_VAULT_SCOPE" --query accessToken --output tsv) # > /dev/null 2>&1;
+    TOKEN=$(az account get-access-token --tenant "$TENANT_ID" --scope "$KEY_VAULT_SCOPE" --query accessToken --output tsv) # > /dev/null 2>&1;
     # Download and extract certificate from Azure Key Vault
     CERT="$CERT_DIR/bolt"
     az keyvault secret download --vault-name "${KEY_VAULT_NAME}" --name "${KEY_NAME}" --file "$CERT.pfx" # > /dev/null 2>&1;

@@ -10,6 +10,7 @@ from typing import Optional
 from opentelemetry import trace
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.trace import Tracer
+from sqlalchemy import null
 
 _logger = logging.getLogger(__name__)
 _configured = False
@@ -82,7 +83,8 @@ def init_telemetry(connection_string: str, sampling_ratio: Optional[float] = Non
         _MESSAGE_PREFIX = "Transmission succeeded:"
 
         def filter(self, record: logging.LogRecord) -> bool:  # noqa: D401
-            return not record.getMessage().startswith(self._MESSAGE_PREFIX)
+            return not record.getMessage().startswith(self._MESSAGE_PREFIX) or \
+            (record.pathname and record.pathname.lower().find("api/v1/stats/health-check") < 0)
 
     logging.getLogger("azure.monitor.opentelemetry.exporter.export._base").addFilter(
         _SuppressTransmissionLogs()

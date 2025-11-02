@@ -80,7 +80,7 @@ async def oauth_protected_resource_metadata(resource_path: str = "") -> JSONResp
 			metadata[k] = openid.get(k)
 
 	# Normalize requested resource path (leading slash) and include for callers
-	requested_resource = f  "/{resource_path}" if resource_path else ""
+	requested_resource = f"/{resource_path}" if resource_path else ""
 	metadata["resource"] = requested_resource
 
 	return JSONResponse(status_code=200, content=metadata)

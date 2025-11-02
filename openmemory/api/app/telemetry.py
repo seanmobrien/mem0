@@ -83,7 +83,7 @@ def init_telemetry(connection_string: str, sampling_ratio: Optional[float] = Non
         _MESSAGE_PREFIX = "Transmission succeeded:"
 
         def filter(self, record: logging.LogRecord) -> bool:  # noqa: D401
-            return not record.getMessage().startswith(self._MESSAGE_PREFIX);
+            return not record.getMessage().startswith(self._MESSAGE_PREFIX)
 
     class _SuppressHealthCheckLogs(logging.Filter):
         _MESSAGE_PREFIX = "Health check succeeded:"

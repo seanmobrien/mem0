@@ -1,4 +1,6 @@
 name: Get Image Tag for Service
+permissions:
+  contents: read
 
 on:
   workflow_call:

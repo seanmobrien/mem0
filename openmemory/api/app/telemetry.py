@@ -90,7 +90,10 @@ def init_telemetry(connection_string: str, sampling_ratio: Optional[float] = Non
         _MESSAGE_PREFIX = "Health check succeeded:"
 
         def filter(self, record: logging.LogRecord) -> bool:  # noqa: D401
-            return not (record.pathname and record.pathname.lower().find("api/v1/stats/health-check") < 0)
+            shouldSkip = (record.pathname and record.pathname.lower().find("api/v1/stats/health-check") >= 0) \
+                or record.name =='ping.get'
+            return not shouldSkip
+                
 
 
     logging.getLogger("azure.monitor.opentelemetry.exporter.export._base").addFilter(

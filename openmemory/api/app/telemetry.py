@@ -26,6 +26,7 @@ DISABLED_INSTRUMENTATIONS = {
         "requests",
         "urllib",
         "urllib3",
+        "django",
     )
 }
 
@@ -84,9 +85,24 @@ def init_telemetry(connection_string: str, sampling_ratio: Optional[float] = Non
         def filter(self, record: logging.LogRecord) -> bool:  # noqa: D401
             return not record.getMessage().startswith(self._MESSAGE_PREFIX)
 
+    class _SuppressHealthCheckLogs(logging.Filter):
+        _MESSAGE_PREFIX = "Health check succeeded:"
+
+        def filter(self, record: logging.LogRecord) -> bool:  # noqa: D401
+            shouldSkip = (record.pathname and record.pathname.lower().find("api/v1/stats/health-check") >= 0) \
+                or record.name =='ping.get'
+            return not shouldSkip
+                
+
+
     logging.getLogger("azure.monitor.opentelemetry.exporter.export._base").addFilter(
         _SuppressTransmissionLogs()
     )
+    
+    logging.getLogger("azure.monitor.opentelemetry.exporter.export._base").addFilter(
+        _SuppressHealthCheckLogs()
+    )
+
 
     configure_azure_monitor(
         connection_string=connection_string,

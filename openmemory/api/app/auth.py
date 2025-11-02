@@ -31,6 +31,8 @@ KEYCLOAK_CLIENT_SECRET = os.getenv("KEYCLOAK_CLIENT_SECRET", "")
 ADMIN_ROLE = "memory_admin"
 USER_ROLE = "memory_user"
 
+OAuthProtectedResource = "Bearer resource_metadata=\".well-known/oauth-protected-resource\" scope=\"mcp_tools\""
+
 # Feature flag for authentication - it must be explicitly disabled to bypass
 AUTH_ENABLED = not os.getenv("AUTH_ENABLED", "true").lower() in ("false", "0", "no", "off")
 
@@ -96,7 +98,7 @@ def verify_token(token: str) -> Dict[str, Any]:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Token is not active",
-                headers={"WWW-Authenticate": "Bearer"},
+                headers={"WWW-Authenticate": OAuthProtectedResource},
             )
         if (not has_role(token_info, USER_ROLE)):
             logging.error("User does not have the required role for memory system access")
@@ -114,7 +116,7 @@ def verify_token(token: str) -> Dict[str, Any]:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Could not validate credentials",
-            headers={"WWW-Authenticate": "Bearer"},
+            headers={"WWW-Authenticate": OAuthProtectedResource},
         )
 
 

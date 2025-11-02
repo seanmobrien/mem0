@@ -24,7 +24,7 @@ def upgrade() -> None:
     """Upgrade schema."""
     
     conn = op.get_bind()
-    now = datetime.utcnow().isoformat()
+    now = datetime.datetime.utcnow().isoformat()
     app_id = str(uuid.uuid4())
     # Get the owner_id for "Default User"
     result = conn.execute(

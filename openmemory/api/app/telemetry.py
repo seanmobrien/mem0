@@ -27,6 +27,7 @@ DISABLED_INSTRUMENTATIONS = {
         "requests",
         "urllib",
         "urllib3",
+        "django",
     )
 }
 

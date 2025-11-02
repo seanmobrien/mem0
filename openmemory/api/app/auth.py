@@ -116,7 +116,7 @@ def verify_token(token: str) -> Dict[str, Any]:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Could not validate credentials",
-            headers={"WWW-Authenticate": OAuthProtectedResource },
+            headers={"WWW-Authenticate": OAuthProtectedResource},
         )
 
 

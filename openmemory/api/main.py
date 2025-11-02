@@ -10,7 +10,7 @@ from app.models import User, App
 from uuid import uuid4
 from app.config import USER_ID, DEFAULT_APP_ID
 from app.telemetry import init_telemetry
-from openmemory.api.app.routers import well_known_auth
+from app.routers import well_known_auth
 
 publicUrl = os.getenv("NEXT_PUBLIC_URL") or "http://localhost:8000"
 _telemetry_connection_string = os.getenv("AZURE_MONITOR_CONNECTION_STRING", "")

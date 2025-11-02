@@ -10,7 +10,6 @@ from typing import Optional
 from opentelemetry import trace
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.trace import Tracer
-from sqlalchemy import null
 
 _logger = logging.getLogger(__name__)
 _configured = False

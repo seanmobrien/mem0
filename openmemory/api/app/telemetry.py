@@ -103,9 +103,6 @@ def init_telemetry(connection_string: str, sampling_ratio: Optional[float] = Non
         _SuppressHealthCheckLogs()
     )
 
-    logging.getLogger("azure.monitor.opentelemetry.exporter.export._base").addFilter(
-        _SuppressHealthCheckLogs()
-    )
 
     configure_azure_monitor(
         connection_string=connection_string,

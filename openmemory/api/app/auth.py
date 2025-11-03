@@ -31,7 +31,7 @@ KEYCLOAK_CLIENT_SECRET = os.getenv("KEYCLOAK_CLIENT_SECRET", "")
 ADMIN_ROLE = "memory_admin"
 USER_ROLE = "memory_user"
 
-OAuthProtectedResource = "Bearer resource_metadata=\".well-known/oauth-protected-resource\" scope=\"mcp_tools\""
+OAuthProtectedResource = "Bearer resource_metadata=\".well-known/oauth-protected-resource\" scope=\"mcp_tool\""
 
 # Feature flag for authentication - it must be explicitly disabled to bypass
 AUTH_ENABLED = not os.getenv("AUTH_ENABLED", "true").lower() in ("false", "0", "no", "off")

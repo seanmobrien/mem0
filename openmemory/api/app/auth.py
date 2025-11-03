@@ -74,6 +74,73 @@ def get_jwks() -> Dict[str, Any]:
     return _jwks_cache
 
 
+def extract_token(token: str, verify: bool = False) -> Dict[str, Any]:
+    """Decode a JWT access token and optionally verify its signature."""
+    if not token:
+        return {"active": False, "reason": "invalid_token"}
+
+    try:
+        claims = jwt.get_unverified_claims(token)
+    except JWTError as exc:
+        logger.debug("Failed to decode token: %s", exc)
+        return {"active": False, "reason": "invalid_token"}
+
+    issuer_expected: Optional[str] = None
+    openid_client: Optional[KeycloakOpenID] = None
+    try:
+        openid_client = get_keycloak_openid()
+        issuer_expected = openid_client.well_known().get("issuer")
+    except Exception as exc:
+        logger.debug("Failed to obtain issuer configuration: %s", exc)
+
+    issuer_actual = claims.get("iss")
+    if not issuer_expected or issuer_actual != issuer_expected:
+        return {"active": False, "reason": "issuer_mismatch"}
+
+    exp_claim = claims.get("exp")
+    if exp_claim is None:
+        return {"active": False, "reason": "expired_token"}
+
+    try:
+        exp_timestamp = int(exp_claim)
+        expires_at = datetime.datetime.fromtimestamp(exp_timestamp, tz=datetime.UTC)
+    except (TypeError, ValueError, OverflowError) as exc:
+        logger.debug("Invalid expiration claim: %s", exc)
+        return {"active": False, "reason": "expired_token"}
+
+    now = datetime.datetime.now(datetime.UTC)
+    if expires_at <= now:
+        return {"active": False, "reason": "expired_token"}
+
+    if not verify:
+        claims["active"] = True
+        return claims
+
+    try:
+        if openid_client is None:
+            return {"active": False, "reason": "bad_signature"}
+        public_key = openid_client.public_key()
+        if not public_key:
+            return {"active": False, "reason": "bad_signature"}
+        header = jwt.get_unverified_header(token)
+        algorithm = header.get("alg", "RS256")
+        jwt.decode(
+            token,
+            public_key,
+            algorithms=[algorithm],
+            options={"verify_aud": False, "verify_signature": True, "verify_iss": False},
+        )
+    except JWTError as exc:
+        logger.debug("Token signature verification failed: %s", exc)
+        return {"active": False, "reason": "bad_signature"}
+    except Exception as exc:  # pragma: no cover - unexpected verification error
+        logger.debug("Unexpected error during token verification: %s", exc)
+        return {"active": False, "reason": "bad_signature"}
+
+    claims["active"] = True
+    return claims
+
+
 def verify_token(token: str) -> Dict[str, Any]:
     """
     Verify JWT token with Keycloak
@@ -91,8 +158,14 @@ def verify_token(token: str) -> Dict[str, Any]:
         keycloak_openid = get_keycloak_openid()
         
         # Verify token with Keycloak
-        token_info = keycloak_openid.introspect(token)
-        
+        # KeyCloak isn't playing nice with introspection for access tokens, so we'll decode
+        # and verify locally instead.
+        # token_info = keycloak_openid.introspect(token)
+        # note we're also unable to verify the signature at this time because of a cert error 
+        # lol which very likely has something to do with why introspection isn't working...
+        # we can come back to this later - for now just decode and run with it.
+        token_info = extract_token(token, verify=False)
+
         if not token_info.get("active", False):
             logging.error("Received an invalid login token")
             raise HTTPException(

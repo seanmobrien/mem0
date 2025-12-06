@@ -17,7 +17,7 @@ Key features:
 
 import logging
 import json
-from typing import Any, Dict, List, Mapping, Optional
+from typing import Any, Dict, List, Mapping, Optional, TypedDict
 from mcp.server.fastmcp import FastMCP, Context
 from opentelemetry import context as otel_context, trace
 from opentelemetry.propagate import extract
@@ -61,6 +61,20 @@ from mcp.server.sse import SseServerTransport
 from opentelemetry import trace
 from opentelemetry.trace import SpanKind
 from qdrant_client import models as qdrant_models
+
+
+class FilterClause(TypedDict, total=False):
+    """Minimal Qdrant filter clause: either a match or a range."""
+    key: str
+    match: Dict[str, Any]
+    range: Dict[str, Any]
+
+
+class FilterDict(TypedDict, total=False):
+    """Lightweight Qdrant filter structure used by search_memory."""
+    must: List[FilterClause]
+    must_not: List[FilterClause]
+    should: List[FilterClause]
 
 # Load environment variables
 load_dotenv()
@@ -118,8 +132,6 @@ def _attach_trace_context_from_request(request: Request) -> Optional[object]:
     except Exception as exc:  # pragma: no cover - defensive logging
         logging.debug("Failed to extract trace context: %s", exc)
         return None
-
-
 def _detach_trace_context(token: Optional[object]) -> None:
     if token is not None:
         otel_context.detach(token)
@@ -260,7 +272,7 @@ async def add_memories(text: str, metadata: Mapping[str, Any] = None) -> str | M
 
 
 @mcp.tool(description="Peforms a vector Search through stored memories. This method is called EVERYTIME the user asks anything.  Supports pagination if more context is necessary, but pay attention to the result score.")
-async def search_memory(query: str, numberOfHits = 10, page = 1, filters: Union[qdrant_models.Filter, dict, None] = None) -> str:
+async def search_memory(query: str, numberOfHits = 10, page = 1, filters: Optional[FilterDict] = None) -> str:
     logging.info("Search Memory called with query: %s", query)
 
     with _TRACER.start_as_current_span("mcp.tool.search_memory", kind=SpanKind.INTERNAL) as span:
@@ -284,13 +296,15 @@ async def search_memory(query: str, numberOfHits = 10, page = 1, filters: Union[
         try:
             with _TRACER.start_as_current_span("memory.search") as search_span:
                 search_span.set_attribute("mem0.filters_present", bool(filters))
+                # Cast FilterDict to qdrant_models.Filter if provided
+                qdrant_filters = qdrant_models.Filter(**filters) if filters else None
                 memories = await search_memories(
                     query=query,
                     user_id=uid,
                     app_id=client_name,
                     numberOfHits=numberOfHits,
                     page=page,
-                    filters=filters,
+                    filters=qdrant_filters,
                 )
 
             with _TRACER.start_as_current_span("memory.log_access"):

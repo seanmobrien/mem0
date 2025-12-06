@@ -422,6 +422,12 @@ async def create_memory(
                             "memory": result.get("memory"),
                             "state": existing_memory.state.value,
                         })
+                    else:
+                        processed_results.append({
+                            "id": str(memory_id),
+                            "event": event_type,
+                            "not_found": True,
+                        })
             db.commit()
             return processed_results
 

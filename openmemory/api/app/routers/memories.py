@@ -311,57 +311,94 @@ async def create_memory(
 
     # Try to save to Qdrant via memory_client
     try:
+        metadata = {
+            "source_app": "openmemory",
+            "mcp_client": request.app,
+            **(request.metadata or {}),
+        }
+
         qdrant_response = memory_client.add(
             request.text,
-            user_id=request.user_id,  # Use string user_id to match search
-            metadata={
-                "source_app": "openmemory",
-                "mcp_client": request.app,
-            }
+            user_id=user.user_id,  # Use string user_id to match search
+            metadata=metadata,
         )
-        
+
         # Log the response for debugging
         logging.info(f"Qdrant response: {qdrant_response}")
-        
+
+        processed_results = []
+
         # Process Qdrant response
         if isinstance(qdrant_response, dict) and 'results' in qdrant_response:
+            now_ts = datetime.now(UTC)
             for result in qdrant_response['results']:
-                if result['event'] == 'ADD':
-                    # Get the Qdrant-generated ID
-                    memory_id = UUID(result['id'])
-                    
-                    # Check if memory already exists
-                    existing_memory = db.query(Memory).filter(Memory.id == memory_id).first()
-                    
+                event_type = result.get('event')
+                memory_id = UUID(result['id'])
+                existing_memory = db.query(Memory).filter(Memory.id == memory_id).first()
+
+                if event_type == 'ADD':
                     if existing_memory:
-                        # Update existing memory
+                        old_state = existing_memory.state
                         existing_memory.state = MemoryState.active
                         existing_memory.content = result['memory']
-                        memory = existing_memory
+                        existing_memory.metadata_ = request.metadata
+                        memory_obj = existing_memory
                     else:
-                        # Create memory with the EXACT SAME ID from Qdrant
-                        memory = Memory(
-                            id=memory_id,  # Use the same ID that Qdrant generated
+                        memory_obj = Memory(
+                            id=memory_id,
                             user_id=user.id,
                             app_id=app_obj.id,
                             content=result['memory'],
                             metadata_=request.metadata,
-                            state=MemoryState.active
+                            state=MemoryState.active,
+                            created_at=now_ts,
                         )
-                        db.add(memory)
-                    
-                    # Create history entry
+                        db.add(memory_obj)
+                        old_state = MemoryState.deleted
+
                     history = MemoryStatusHistory(
                         memory_id=memory_id,
                         changed_by=user.id,
-                        old_state=MemoryState.deleted if existing_memory else MemoryState.deleted,
-                        new_state=MemoryState.active
+                        old_state=old_state,
+                        new_state=MemoryState.active,
+                        changed_at=now_ts,
                     )
                     db.add(history)
-                    
-                    db.commit()
-                    db.refresh(memory)
-                    return memory
+
+                    processed_results.append({
+                        "id": str(memory_id),
+                        "event": event_type,
+                        "memory": result.get("memory"),
+                        "state": MemoryState.active.value,
+                    })
+
+                elif event_type == 'DELETE':
+                    if existing_memory:
+                        old_state = existing_memory.state
+                        existing_memory.state = MemoryState.deleted
+                        existing_memory.deleted_at = now_ts
+
+                        history = MemoryStatusHistory(
+                            memory_id=memory_id,
+                            changed_by=user.id,
+                            old_state=old_state,
+                            new_state=MemoryState.deleted,
+                            changed_at=now_ts,
+                        )
+                        db.add(history)
+
+                    processed_results.append({
+                        "id": str(memory_id),
+                        "event": event_type,
+                        "state": MemoryState.deleted.value,
+                    })
+
+            db.commit()
+            return processed_results
+
+        # If response is not the expected structure, just return it as-is
+        db.commit()
+        return qdrant_response
     except Exception as qdrant_error:
         logging.warning(f"Qdrant operation failed: {qdrant_error}.")
         raise ValueError(f"Failed to create memory: {qdrant_error}")        

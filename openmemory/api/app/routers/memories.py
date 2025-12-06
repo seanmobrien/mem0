@@ -386,12 +386,17 @@ async def create_memory(
                         )
                         db.add(history)
 
-                    processed_results.append({
-                        "id": str(memory_id),
-                        "event": event_type,
-                        "state": MemoryState.deleted.value,
-                    })
-
+                        processed_results.append({
+                            "id": str(memory_id),
+                            "event": event_type,
+                            "state": MemoryState.deleted.value,
+                        })
+                    else:
+                        processed_results.append({
+                            "id": str(memory_id),
+                            "event": event_type,
+                            "not_found": True,
+                        })
                 elif event_type == 'UPDATE':
                     if existing_memory:
                         old_state = existing_memory.state

@@ -296,13 +296,15 @@ async def search_memory(query: str, numberOfHits = 10, page = 1, filters: Option
         try:
             with _TRACER.start_as_current_span("memory.search") as search_span:
                 search_span.set_attribute("mem0.filters_present", bool(filters))
+                # Cast FilterDict to qdrant_models.Filter if provided
+                qdrant_filters = qdrant_models.Filter(**filters) if filters else None
                 memories = await search_memories(
                     query=query,
                     user_id=uid,
                     app_id=client_name,
                     numberOfHits=numberOfHits,
                     page=page,
-                    filters=filters,
+                    filters=qdrant_filters,
                 )
 
             with _TRACER.start_as_current_span("memory.log_access"):

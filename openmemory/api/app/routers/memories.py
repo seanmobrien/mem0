@@ -341,7 +341,7 @@ async def create_memory(
                         old_state = existing_memory.state
                         existing_memory.state = MemoryState.active
                         existing_memory.content = result['memory']
-                        existing_memory.metadata_ = request.metadata
+                        existing_memory.metadata_ = metadata
                     else:
                         memory_obj = Memory(
                             id=memory_id,
@@ -421,6 +421,12 @@ async def create_memory(
                             "event": event_type,
                             "memory": result.get("memory"),
                             "state": existing_memory.state.value,
+                        })
+                    else:
+                        processed_results.append({
+                            "id": str(memory_id),
+                            "event": event_type,
+                            "not_found": True,
                         })
             db.commit()
             return processed_results

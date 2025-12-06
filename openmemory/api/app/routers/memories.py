@@ -341,7 +341,7 @@ async def create_memory(
                         old_state = existing_memory.state
                         existing_memory.state = MemoryState.active
                         existing_memory.content = result['memory']
-                        existing_memory.metadata_ = request.metadata
+                        existing_memory.metadata_ = metadata
                     else:
                         memory_obj = Memory(
                             id=memory_id,

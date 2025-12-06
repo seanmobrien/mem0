@@ -341,7 +341,7 @@ async def create_memory(
                         old_state = existing_memory.state
                         existing_memory.state = MemoryState.active
                         existing_memory.content = result['memory']
-                        existing_memory.metadata_ = request.metadata
+                        existing_memory.metadata_ = metadata
                         memory_obj = existing_memory
                     else:
                         memory_obj = Memory(
@@ -349,7 +349,7 @@ async def create_memory(
                             user_id=user.id,
                             app_id=app_obj.id,
                             content=result['memory'],
-                            metadata_=request.metadata,
+                            metadata_=metadata,
                             state=MemoryState.active,
                             created_at=now_ts,
                         )
@@ -398,7 +398,7 @@ async def create_memory(
                         old_state = existing_memory.state
                         # Update memory content and metadata
                         existing_memory.content = result.get('memory', existing_memory.content)
-                        existing_memory.metadata_ = request.metadata
+                        existing_memory.metadata_ = metadata
                         # Optionally update other fields if present in result
                         # existing_memory.state = MemoryState.active  # If state should be set to active on update
                         # existing_memory.updated_at = now_ts  # If you track update time

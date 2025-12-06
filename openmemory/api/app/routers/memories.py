@@ -393,6 +393,31 @@ async def create_memory(
                         "state": MemoryState.deleted.value,
                     })
 
+                elif event_type == 'UPDATE':
+                    if existing_memory:
+                        old_state = existing_memory.state
+                        # Update memory content and metadata
+                        existing_memory.content = result.get('memory', existing_memory.content)
+                        existing_memory.metadata_ = request.metadata
+                        # Optionally update other fields if present in result
+                        # existing_memory.state = MemoryState.active  # If state should be set to active on update
+                        # existing_memory.updated_at = now_ts  # If you track update time
+
+                        history = MemoryStatusHistory(
+                            memory_id=memory_id,
+                            changed_by=user.id,
+                            old_state=old_state,
+                            new_state=existing_memory.state,
+                            changed_at=now_ts,
+                        )
+                        db.add(history)
+
+                        processed_results.append({
+                            "id": str(memory_id),
+                            "event": event_type,
+                            "memory": result.get("memory"),
+                            "state": existing_memory.state.value,
+                        })
             db.commit()
             return processed_results
 

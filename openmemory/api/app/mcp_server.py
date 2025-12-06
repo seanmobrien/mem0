@@ -132,7 +132,6 @@ def _attach_trace_context_from_request(request: Request) -> Optional[object]:
     except Exception as exc:  # pragma: no cover - defensive logging
         logging.debug("Failed to extract trace context: %s", exc)
         return None
-
 def _detach_trace_context(token: Optional[object]) -> None:
     if token is not None:
         otel_context.detach(token)

@@ -341,8 +341,7 @@ async def create_memory(
                         old_state = existing_memory.state
                         existing_memory.state = MemoryState.active
                         existing_memory.content = result['memory']
-                        existing_memory.metadata_ = metadata
-                        memory_obj = existing_memory
+                        existing_memory.metadata_ = request.metadata
                     else:
                         memory_obj = Memory(
                             id=memory_id,
@@ -387,12 +386,17 @@ async def create_memory(
                         )
                         db.add(history)
 
-                    processed_results.append({
-                        "id": str(memory_id),
-                        "event": event_type,
-                        "state": MemoryState.deleted.value,
-                    })
-
+                        processed_results.append({
+                            "id": str(memory_id),
+                            "event": event_type,
+                            "state": MemoryState.deleted.value,
+                        })
+                    else:
+                        processed_results.append({
+                            "id": str(memory_id),
+                            "event": event_type,
+                            "not_found": True,
+                        })
                 elif event_type == 'UPDATE':
                     if existing_memory:
                         old_state = existing_memory.state

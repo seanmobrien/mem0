@@ -69,11 +69,38 @@ async def search_memories(
     """
     # Start a top-level span for the memory search operation
     with _TRACER.start_as_current_span("memory_client.search", kind=SpanKind.INTERNAL) as span:
+        # Defensive coalescence for user-provided inputs
+        user_id = "" if user_id is None else str(user_id)
+        app_id = "" if app_id is None else str(app_id)
+        query = "" if query is None else str(query)
+        if not user_id:
+            error = AssertionError("Error: user_id not provided")
+            _record_exception(span, error)
+            raise error
+        if not app_id:
+            error = AssertionError("Error: app_id not provided")
+            _record_exception(span, error)
+            raise error
+
         span.set_attribute("mem0.user_id", user_id)
         span.set_attribute("mem0.app_id", app_id)
         span.set_attribute("mem0.query", query)
-        span.set_attribute("mem0.search.limit", numberOfHits)
-        span.set_attribute("mem0.search.page", page)
+
+        # Normalize pagination inputs to avoid downstream type errors when callers pass strings
+        try:
+            limit = int(numberOfHits)
+        except (TypeError, ValueError):
+            limit = 10
+        limit = max(1, limit)
+
+        try:
+            page_number = int(page)
+        except (TypeError, ValueError):
+            page_number = 1
+        page_number = max(1, page_number)
+
+        span.set_attribute("mem0.search.limit", limit)
+        span.set_attribute("mem0.search.page", page_number)
 
         # Get memory client safely
         memory_client = get_memory_client_safe()
@@ -110,6 +137,9 @@ async def search_memories(
                 baseline_filters = qdrant_models.Filter(must=conditions)
 
                 # Merge with additional filters if provided
+                if filters is not None and not isinstance(filters, (qdrant_models.Filter, dict)):
+                    raise ValueError("filters must be a qdrant Filter or dict")
+
                 final_filters = _merge_filters(baseline_filters, filters)
                 span.set_attribute("mem0.filters_present", bool(final_filters and final_filters.must))
 
@@ -124,17 +154,20 @@ async def search_memories(
                 # Perform the provider-level search inside its own span
                 with _TRACER.start_as_current_span("vector_store.search") as vs_span:
                     try:
-                        vs_span.set_attribute("mem0.vector_provider", getattr(memory_client.vector_store, "__class__", type(memory_client.vector_store)).__name__)
-                        vs_span.set_attribute("mem0.search.limit", numberOfHits)
-                        vs_span.set_attribute("mem0.search.page", page)
+                        vs_span.set_attribute(
+                            "mem0.vector_provider",
+                            getattr(memory_client.vector_store, "__class__", type(memory_client.vector_store)).__name__,
+                        )
+                        vs_span.set_attribute("mem0.search.limit", limit)
+                        vs_span.set_attribute("mem0.search.page", page_number)
                         vs_span.set_attribute("mem0.search.query_present", bool(query))
 
                         hits = memory_client.vector_store.search(
                             query,
                             embeddings,
-                            numberOfHits,
+                            limit,
                             final_filters,
-                            page,
+                            page_number,
                         )
                     except Exception as e:
                         _record_exception(vs_span, e)
@@ -191,45 +224,59 @@ async def log_memory_access(
         access_type: Type of access (default: "search")
     """
     try:
+        # Defensive coalescence for caller inputs
+        user_id = "" if user_id is None else str(user_id)
+        app_id = "" if app_id is None else str(app_id)
+        query = "" if query is None else str(query)
+        access_type = "search" if access_type is None else str(access_type) or "search"
+
+        if memories is None:
+            memories = []
+
         db = SessionLocal()
         try:
             # Get or create user and app
             user, app = get_user_and_app(db, user_id=user_id, app_id=app_id)
 
-            # Log memory access for each memory found
+            # Normalize memories into iterable of dicts
             if isinstance(memories, dict) and 'results' in memories:
-                for memory_data in memories['results']:
-                    if 'id' in memory_data:
-                        memory_id = uuid.UUID(memory_data['id'])
-                        # Create access log entry
-                        access_log = MemoryAccessLog(
-                            memory_id=memory_id,
-                            app_id=app.id,
-                            access_type=access_type,
-                            metadata_={
-                                "query": query,
-                                "score": memory_data.get('score'),
-                                "hash": memory_data.get('hash')
-                            }
-                        )
-                        db.add(access_log)
-                db.commit()
+                iterable = memories['results'] or []
             else:
-                for memory in memories:
-                    memory_id = uuid.UUID(memory['id'])
-                    # Create access log entry
-                    access_log = MemoryAccessLog(
-                        memory_id=memory_id,
-                        app_id=app.id,
-                        access_type=access_type,
-                        metadata_={
-                            "query": query,
-                            "score": memory.get('score'),
-                            "hash": memory.get('hash')
-                        }
-                    )
-                    db.add(access_log)
-                db.commit()
+                iterable = memories
+
+            for memory in iterable:
+                memory_id_raw = None
+                if isinstance(memory, dict):
+                    memory_id_raw = memory.get('id')
+                    score = memory.get('score')
+                    hash_val = memory.get('hash')
+                else:
+                    memory_id_raw = getattr(memory, 'id', None)
+                    score = getattr(memory, 'score', None)
+                    hash_val = getattr(memory, 'hash', None)
+
+                if not memory_id_raw:
+                    continue
+
+                try:
+                    memory_id = uuid.UUID(str(memory_id_raw))
+                except Exception:
+                    logging.warning("Skipping memory access log due to invalid id: %s", memory_id_raw)
+                    continue
+
+                access_log = MemoryAccessLog(
+                    memory_id=memory_id,
+                    app_id=app.id,
+                    access_type=access_type,
+                    metadata_={
+                        "query": query,
+                        "score": score,
+                        "hash": hash_val,
+                    },
+                )
+                db.add(access_log)
+
+            db.commit()
         finally:
             db.close()
     except Exception as e:

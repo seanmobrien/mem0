@@ -206,8 +206,21 @@ class PGVector(VectorStoreBase):
         """
         filter_conditions, filter_params = self._process_filters(filters)
 
+        # Ensure pagination inputs are integers to avoid type errors from user-provided strings
+        try:
+            page_number = int(pageNumber)
+        except (TypeError, ValueError):
+            page_number = 1
+        page_number = max(1, page_number)
+
+        try:
+            limit_value = int(limit)
+        except (TypeError, ValueError):
+            limit_value = 5
+        limit_value = max(1, limit_value)
+
         filter_clause = "WHERE " + " AND ".join(filter_conditions) if filter_conditions else ""
-        offset_clause = f"OFFSET {(pageNumber - 1) * limit}" if pageNumber > 1 else ""
+        offset_clause = f"OFFSET {(page_number - 1) * limit_value}" if page_number > 1 else ""
         self.cur.execute(
             f"""
             SELECT id, vector <=> %s::vector AS distance, payload
@@ -216,7 +229,7 @@ class PGVector(VectorStoreBase):
             ORDER BY distance
             LIMIT %s {offset_clause}
         """,
-            (vectors, *filter_params, limit),
+            (vectors, *filter_params, limit_value),
         )
 
         results = self.cur.fetchall()

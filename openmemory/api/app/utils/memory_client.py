@@ -207,7 +207,7 @@ async def search_memories(
 
 
 async def log_memory_access(
-    memories: List[Dict[str, Any]],
+    memories: Union[List[Dict[str, Any]], Dict[str, Any], None],
     user_id: str,
     app_id: str,
     query: str,

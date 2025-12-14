@@ -471,11 +471,25 @@ class MemoryGraph:
         return results
 
     def _remove_spaces_from_entities(self, entity_list):
+        cleaned = []
         for item in entity_list:
-            item["source"] = item["source"].lower().replace(" ", "_")
-            item["relationship"] = item["relationship"].lower().replace(" ", "_")
-            item["destination"] = item["destination"].lower().replace(" ", "_")
-        return entity_list
+            # Skip malformed tool outputs instead of crashing
+            source = item.get("source") if isinstance(item, dict) else None
+            relationship = item.get("relationship") if isinstance(item, dict) else None
+            destination = item.get("destination") if isinstance(item, dict) else None
+
+            if not source or not relationship or not destination:
+                logger.warning("Skipping malformed graph entity: %s", item)
+                continue
+
+            cleaned.append(
+                {
+                    "source": str(source).lower().replace(" ", "_"),
+                    "relationship": str(relationship).lower().replace(" ", "_"),
+                    "destination": str(destination).lower().replace(" ", "_"),
+                }
+            )
+        return cleaned
 
     def _search_source_node(self, source_embedding, user_id, threshold=0.9):
         cypher = f"""

@@ -207,7 +207,7 @@ async def search_memories(
 
 
 async def log_memory_access(
-    memories: List[Dict[str, Any]],
+    memories: Union[List[Dict[str, Any]], Dict[str, Any], None],
     user_id: str,
     app_id: str,
     query: str,
@@ -217,7 +217,7 @@ async def log_memory_access(
     Log memory access for a list of memories.
     
     Args:
-        memories: List of memory dictionaries from search results
+        memories: Memory search results - can be a list of dicts, a dict with 'results' key, or None
         user_id: ID of the user accessing memories
         app_id: ID of the app/client accessing memories
         query: The search query that was performed

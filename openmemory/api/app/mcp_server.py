@@ -341,7 +341,7 @@ async def search_memory(query: str, numberOfHits = 10, page = 1, filters: Option
         except ValueError as e:
             _record_exception(span, e)
             logging.exception(f"Error searching memory: {e}")
-            raise ValueError(f"Error searching memory: {e}")        
+            raise ValueError(f"Error searching memory: {e}")
         except Exception as e:
             _record_exception(span, e)
             logging.exception(e)

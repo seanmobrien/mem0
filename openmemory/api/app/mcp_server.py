@@ -147,8 +147,12 @@ mcp_router = APIRouter(prefix="/mcp")
 # Initialize SSE transport
 sse = SseServerTransport("/mcp/messages")
 
-@mcp.tool(description="Add a new memory. This method is called everytime the user informs anything about themselves, their preferences, or anything that has any relevant information which can be useful in the future conversation. This can also be called when the user asks you to remember something.  " +
-          "Metadata can be provided to store additional information that can be useful for filtering or categorizing memories later.  Any arbitrary metadata can be provided, but some special keys include:\n - 'document_id': The case file or document to associate with a memory.  Always provide this if available.\n - 'created_at': when present, this will be used as the memory creation date.  This should always be set to the send date of the analyzed document. - 'chat_thread': the thread ID of the chat where this message was sent.")
+@mcp.tool(description="This is the only mechanism to store long-term memory. After answering, perform a quick extraction pass and store durable facts and evidence anchors grounded in the Latest Interaction.\n" +
+"📌 MUST store: identifiers (case/email/attachment IDs), dates, statutes/policies cited, explicit actions/decisions, and stable user preferences/instructions.\n" +
+"📌 MUST NOT store: speculation, or ephemeral topics.\n" +
+"📌 Cap: 3 memories unless the interaction contains multiple distinct artifacts (e.g., many IDs).\n" +
+"📌 Grounding: memory text must be directly supported by the Latest Interaction."
+)
 async def add_memories(text: str, metadata: Mapping[str, Any] = None) -> str | Mapping[str, str | List[Any] | Mapping[str, Any]]:
     metadata = dict(metadata or {})
     logging.info("Add Memory called with text: %s", text)
@@ -271,7 +275,9 @@ async def add_memories(text: str, metadata: Mapping[str, Any] = None) -> str | M
             raise MemoryError(f"Error adding to memory: {e}")
 
 
-@mcp.tool(description="Peforms a vector Search through stored memories. This method is called EVERYTIME the user asks anything.  Supports pagination if more context is necessary, but pay attention to the result score.")
+@mcp.tool(description="Performs a semantic (vector-based) search over stored memories using embedding similarity.\n" +
+"Invoke this tool when existing retrieved memories indicate gaps, ambiguity, missing entities, alternate identifiers, or insufficient confidence, and deeper or targeted recall is required.\n" +
+"This tool supports iterative refinement of context (e.g., following surfaced case-file IDs, attachments, timelines, or aliases) and should not be used to repeat searches already summarized in the prompt.")
 async def search_memory(query: str, numberOfHits = 10, page = 1, filters: Optional[FilterDict] = None) -> str:
     logging.info("Search Memory called with query: %s", query)
 
@@ -296,7 +302,7 @@ async def search_memory(query: str, numberOfHits = 10, page = 1, filters: Option
         try:
             with _TRACER.start_as_current_span("memory.search") as search_span:
                 search_span.set_attribute("mem0.filters_present", bool(filters))
-                # Cast FilterDict to qdrant_models.Filter if provided
+                # Cast FilterDict if provided into a qdrant_models.Filter
                 qdrant_filters = qdrant_models.Filter(**filters) if filters else None
                 memories = await search_memories(
                     query=query,
@@ -316,8 +322,17 @@ async def search_memory(query: str, numberOfHits = 10, page = 1, filters: Option
                     access_type="search",
                 )
 
-            results_count = len(memories.get("results", [])) if isinstance(memories, dict) else len(memories)
-            span.set_attribute("mem0.search.results_count", results_count)
+            # Best-effort results count logging
+            try:
+                if isinstance(memories, dict) and "results" in memories:
+                    results_count = len(memories["results"])
+                else:
+                    results_count = len(memories)
+                span.set_attribute("mem0.search.results_count", results_count)
+            except Exception:  # pragma: no cover - defensive
+                pass
+
+            # Return memories as JSON string
             return json.dumps(memories, indent=2)
         except AssertionError as e:
             _record_exception(span, e)

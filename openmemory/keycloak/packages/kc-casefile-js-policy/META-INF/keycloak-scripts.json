@@ -1,9 +1,9 @@
 {
   "policies": [
     {
-      "name": "Case File ACL Policy",
-      "fileName": "case-file-acl-policy.js",
-      "description": "Owner + readers/writers/admins attribute evaluation for case-file resources"
+      "name": "ComplianceTheater 2000 Case File ACL",
+      "fileName": "compliance-theater-2000-case-file-acl.js",
+      "description": "ACL evaluation for case-file resource type."
     }
   ]
 }

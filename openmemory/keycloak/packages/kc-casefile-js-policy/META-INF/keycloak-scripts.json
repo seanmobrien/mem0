@@ -1,0 +1,9 @@
+{
+  "policies": [
+    {
+      "name": "Case File ACL Policy",
+      "fileName": "case-file-acl-policy.js",
+      "description": "Owner + readers/writers/admins attribute evaluation for case-file resources"
+    }
+  ]
+}

@@ -7,9 +7,9 @@ RUN apk add --no-cache fastjar
 WORKDIR /workspace
 # Bring in all provider assets and the script package once; build the JS policy jar inside the builder
 COPY packages/ packages/
-RUN fastjar cf packages/providers/kc-casefile-js-policy.jar \
-    packages/kc-casefile-js-policy/META-INF/keycloak-scripts.json \
-    packages/kc-casefile-js-policy/compliance-theater-2000-case-file-acl.js
+RUN cd packages/kc-casefile-js-policy && fastjar cf ../providers/kc-casefile-js-policy.jar \
+    META-INF/keycloak-scripts.json \
+    kc-casefile-policy.js
 
 # Keycloak OpenMemory Authentication Provider
 FROM quay.io/keycloak/keycloak:26.3.4

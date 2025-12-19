@@ -48,7 +48,7 @@ function getAttrValues(attributes, key) {
 // Works with java.util.Collection / Set / List
 function containsUser(values, id) {
   if (!values || !id) return false;
-  const normalizedId = String(id).toLowerCase();
+  var normalizedId = String(id).toLowerCase();
   // Java collections usually have iterator()
   if (typeof values.iterator === "function") {
     var it = values.iterator();
@@ -93,6 +93,6 @@ if (scopeName === "case-file:read") {
 }
 
 // Default deny
-print('[compliance-theater-2000-case-file-acl] No matching ACL entry found: Default deny');
+print('[compliance-theater-2000-case-file-acl] No matching ACL entry found [' + scopeName + ']: Default deny');
 $evaluation.deny();
 exit(0);

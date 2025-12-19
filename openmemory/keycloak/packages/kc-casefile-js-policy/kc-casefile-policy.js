@@ -1,64 +1,65 @@
-function debugMessage(msg) {
+print('[case-file:acl] ' + 'Starting case file ACL evaluation');
+
+var debugMessage = function(msg) {
   // When debug messages are needed, uncomment the following line
-  // print('[case-file:acl] ' + msg);
-}
+  print('[case-file:acl] ' + msg);
+};
 
-// Works with java.util.Collection / Set / List (iterator) and JS arrays
-function containsUser(values, id) {
-  if (!values || !id) return false;
 
-  var normalizedId = id.toString().toLowerCase();
-
-  if (typeof values.iterator === "function") {
-    var it = values.iterator();
-    while (it.hasNext()) {
-      var checkItem = it.next();
-      if (checkItem && checkItem.toString().toLowerCase() === normalizedId) return true;      
-    }
-    return false;
-  }
-
-  if (Array.isArray(values)) {
-    for (var i = 0; i < values.length; i++) {
-      if (values[i] && values[i].toString().toLowerCase() === normalizedId) return true;
-    }
-  }
-
-  return false;
-}
-
-// Per-scope authorization check
-function isAllowedForScope(scopeName, userId, readers, writers, admins) {
-  if (scopeName === "case-file:read") {
-    return (
-      containsUser(readers, userId) ||
-      containsUser(writers, userId) ||
-      containsUser(admins,  userId)
-    );
-  }
-
-  if (scopeName === "case-file:write") {
-    return (
-      containsUser(writers, userId) ||
-      containsUser(admins,  userId)
-    );
-  }
-
-  if (scopeName === "case-file:admin") {
-    return containsUser(admins, userId);
-  }
-
-  // Unknown scope -> skip
-  return null;
-}
 
 try {
   debugMessage('Defining helper functions');
+  // Per-scope authorization check
+  var isAllowedForScope = function(scopeName, userId, readers, writers, admins) {
+    if (!userId) return false;
+    var normalizedId = userId.toString().toLowerCase();
+    // Works with java.util.Collection / Set / List (iterator) and JS arrays
+    var containsUser = function(values)  {
+      if (!values) return false;
+      if (typeof values.iterator === "function") {
+        var it = values.iterator();
+        while (it.hasNext()) {
+          var checkItem = it.next();
+          if (checkItem && checkItem.toString().toLowerCase() === normalizedId) return true;      
+        }
+        return false;
+      }
 
+      if (Array.isArray(values)) {
+        for (var i = 0; i < values.length; i++) {
+          if (values[i] && values[i].toString().toLowerCase() === normalizedId) return true;
+        }
+      }
+
+      return false;
+    };
+
+    var normalizedScope = scopeName ? scopeName.toString().toLowerCase() : "";
+    if (normalizedScope === "case-file:read") {
+      return (
+        containsUser(readers) ||
+        containsUser(writers) ||
+        containsUser(admins)
+      );
+    }
+
+    if (normalizedScope === "case-file:write") {
+      return (
+        containsUser(writers) ||
+        containsUser(admins)
+      );
+    }
+
+    if (normalizedScope === "case-file:admin") {
+      return containsUser(admins);
+    }
+
+    // Unknown scope -> skip
+    return null;
+  };
   // Map-like or object-like case-insensitive attribute lookup
-  function getAttrValues(attributes, key) {
+  var getAttrValues = function(attributes, key) {
     if (!attributes || !key) return null;
-
     // Fast path: exact key
     if (typeof attributes.get === "function") {
       var direct = attributes.get(key);
@@ -92,7 +93,7 @@ try {
     }
 
     return null;
-  }
+  };
   
   debugMessage('Gathering Context');
 
@@ -151,49 +152,7 @@ try {
     $evaluation.grant();
     exit(0);
   }
-
-  // Getting scopes
-  var scopes = permission.getScopes ? permission.getScopes() : null;
-  if (scopes == null || scopes.isEmpty()) {
-    debugMessage('No scopes found in permission: Default deny');
-    $evaluation.deny();
-    exit(0);
-  }
-
-  var attrs = resource.getAttributes ? resource.getAttributes() : null;
-
-  var readers = getAttrValues(attrs, "readers");
-  var writers = getAttrValues(attrs, "writers");
-  var admins  = getAttrValues(attrs, "admins");
   
-  var anyOk = false;
-
-  var it = scopes.iterator();
-  while (it.hasNext()) {
-    var s = it.next();
-    var scopeName = (s && typeof s.getName === "function") ? s.getName() : s.toString();
-    var ok = isAllowedForScope(scopeName, userId, readers, writers, admins);
-
-    if (ok == null || ok == undefined) {
-      debugMessage('Unknown scope "' + scopeName + '": skipping');
-      continue;
-    }
-
-    if (!ok) {
-      debugMessage('Scope "' + scopeName + '" not allowed: Deny');
-      $evaluation.deny();
-      exit(0);
-    }
-
-    debugMessage('Scope "' + scopeName + '" evaluated OK.');
-    anyOk = true;
-  }
-
-  if (anyOk) {
-    debugMessage('All requested case file scopes allowed: Grant');
-    $evaluation.grant();
-    exit(0);
-  }
 } catch (e) {
   print('[case-file:acl] ' + 'Error evaluating case ACL: ' + e);
 }

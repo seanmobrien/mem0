@@ -26,7 +26,7 @@ jobs:
 
   deploy:
     needs: get-image-tag
-    if: needs.get-image-tag.outputs.image-tag != '' && ((github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') || github.event_name == 'workflow_dispatch')
+    if: needs.get-image-tag.outputs.image-tag != '' && github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     environment: Production
     permissions:
@@ -52,3 +52,20 @@ jobs:
           resourceGroup: SchoolLawyer
           # Keeping environment variables stable until we have a release build
           #environmentVariables: KC_HOSTNAME=${{ vars.KC_HOSTNAME }} KC_LOG_LEVEL=INFO KC_DB_URL_DATABASE=${{ vars.KC_DB_URL_DATABASE }} KC_DB_USERNAME=keycloak_user KC_DB_URL_HOST=${{ vars.KC_DB_URL_HOST }} KC_DB_PASSWORD=secretRef:db-login-password KC_HTTP_ENABLED=true KC_HTTPS_PORT=8443 KEYCLOAK_ADMIN=dog KEYCLOAK_ADMIN_PASSWORD=secretRef:kc-admin-password KC_HTTP_PORT=8080 KC_PII_ENCKEY=secretRef:kc-pii-enckey
+
+  dispatch-self-when-workflow-run:
+    needs: get-image-tag
+    if: needs.get-image-tag.outputs.image-tag != '' && github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch deployment-keycloak on implementation/school-law
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'deployment-keycloak.yml',
+              ref: 'implementation/school-law'
+            })

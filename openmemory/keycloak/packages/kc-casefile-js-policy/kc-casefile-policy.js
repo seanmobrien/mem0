@@ -1,4 +1,4 @@
-print('[case-file:acl] ' + 'Starting case file ACL evaluation');
+print('[case-file:acl] - Starting case file ACL evaluation w/ touch');
 
 // try {
   print('Defining helper functions');

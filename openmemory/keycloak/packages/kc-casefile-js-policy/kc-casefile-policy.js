@@ -1,4 +1,4 @@
-const debugMessage = function(message) {
+var debugMessage = function(message) {
   // Uncomment the line below to enable debug logging
   print('[case-file:acl] ' + message);
 };
@@ -14,11 +14,11 @@ try {
     var containsUser = function(values)  {
       if (!values) return false;
       // If we have a raw string, split on commas or ';'
-      if (typeof values === 'string') {
+      if (typeof values == 'string') {
         // And then send back through to catch the array case
         return containsUser(values.toString().split(/[,;]/));
       }
-      if (typeof values.iterator === "function") {
+      if (typeof values.iterator == "function") {
         var it = values.iterator();
         while (it.hasNext()) {
           var checkItem = it.next();
@@ -38,7 +38,7 @@ try {
     };
 
     var normalizedScope = scopeName ? scopeName.toString().toLowerCase().trim() : "";
-    if (normalizedScope === "case-file:read") {
+    if (normalizedScope == "case-file:read") {
       return (
         containsUser(readers) ||
         containsUser(writers) ||
@@ -46,14 +46,14 @@ try {
       );
     }
 
-    if (normalizedScope === "case-file:write") {
+    if (normalizedScope == "case-file:write") {
       return (
         containsUser(writers) ||
         containsUser(admins)
       );
     }
 
-    if (normalizedScope === "case-file:admin") {
+    if (normalizedScope == "case-file:admin") {
       return containsUser(admins);
     }
 
@@ -65,12 +65,12 @@ try {
     // If not key or not attributes or attributes are not object, return null
     if (!key || !attributes  || typeof attributes !== "object") return null;
     // Fast path: exact key
-    if (typeof attributes.get === "function") {
+    if (typeof attributes.get == "function") {
       var direct = attributes.get(key);
       if (direct != null && direct != undefined) return direct;
 
       // Case-insensitive scan for java.util.Map
-      if (typeof attributes.keySet === "function") {
+      if (typeof attributes.keySet == "function") {
         var it = attributes.keySet().iterator();
         var normalizedKey = key.toString().toLowerCase().trim();
         while (it.hasNext()) {
@@ -140,7 +140,7 @@ try {
     // 1) Owner always allowed
     debugMessage('User is owner: Grant');
     $evaluation.grant();
-  } else if (typeof identity.hasRealmRole === 'function' && identity.hasRealmRole("case-file:global-admin")) {
+  } else if (typeof identity.hasRealmRole == 'function' && identity.hasRealmRole("case-file:global-admin")) {
     // 2) global admin role    
     debugMessage('User has global admin role: Grant');
     $evaluation.grant();
@@ -152,7 +152,7 @@ try {
     }
     // Attributes are typically a java.util.Map<String, java.util.Set<String>>
     var attrs = resource.getAttributes ? resource.getAttributes() : null;
-    debugMessage("-=-=-=-=-=-=--=-=-=-=--=-=-=-=-=- attrs type=" + (attrs ? attrs.getClass ? attrs.getClass() : typeof attrs : "null" + " -=-=-=-=-=-=--=-=-=-=--=-=-=-=-=-"));
+    debugMessage("-=-=-=-=-=-=--=-=-=-=--=-=-=-=-=- attrs type=" + (attrs ? attrs.getClass ? attrs.getClass() : typeof attrs : "null") + " -=-=-=-=-=-=--=-=-=-=--=-=-=-=-=-");
 
     var readers = getAttrValues(attrs, "readers");
     var writers = getAttrValues(attrs, "writers");
@@ -164,7 +164,7 @@ try {
     var it = scopes.iterator();
     while (it.hasNext()) {
       var s = it.next();
-      var scopeName = (s && typeof s.getName === "function") ? s.getName() : s.toString();
+      var scopeName = (s && typeof s.getName == "function") ? s.getName() : s.toString();
       var ok = isAllowedForScope(scopeName, userId, readers, writers, admins);
 
       if (ok == null || ok == undefined) {

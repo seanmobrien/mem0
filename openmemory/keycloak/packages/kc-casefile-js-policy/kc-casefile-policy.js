@@ -12,32 +12,15 @@ try {
     // Works with java.util.Collection / Set / List (iterator) and JS arrays
     var containsUser = function(values)  {
       if (!values) return false;
-      // If we have a raw string, split on commas or ';'
-      if (typeof values == 'string') {
-        debugMessage('*** Checking ACL item: ' + values + ' against userId: ' + userId);
-        // And then send back through to catch the array case
-        return containsUser(values.toString().split(/[,;]/));
-      }
-      if (typeof values.iterator == "function") {
-        var it = values.iterator();
-        while (it.hasNext()) {
-          var checkItem = it.next();
-          if (!checkItem) continue;
-          var normalizedCheckItem = checkItem.toString().toLowerCase().trim();
-          debugMessage('*** Checking ACL item: ' + normalizedCheckItem + ' against userId: ' + userId);
-          if (normalizedCheckItem == userId) return true;      
-        }        
-        return false;
-      }
+      // Values were normalized on the way in - we have an array of lower-case trimmed strings.
       if (Array.isArray(values)) {
         for (var i = 0; i < values.length; i++) {
           debugMessage('*** Checking ACL item: ' + values[i] + ' against userId: ' + userId);
-          if (values[i] && values[i].toString().toLowerCase().trim() == userId) return true;
+          if (values[i] == userId) return true;
         }
       } else {
         debugMessage('Unsupported ACL attribute type: ' + (typeof values) + ' - (' + values + ')');
       }
-
       return false;
     };
 
@@ -66,12 +49,61 @@ try {
   };
   // Map-like or object-like case-insensitive attribute lookup
   var getAttrValues = function(attributes, key) {
+    // Normalize final value into a flattened array of lower-case trimmed strings
+    const normalizeFinalValue = function(target) {
+      if (target == null || target == undefined) return null;      
+      // If we have a raw string, split on commas or ';' and then recursively normalize
+      if (typeof target == 'string') {
+        var parts = target.toString().split(/[,;]/);
+        return normalizeFinalValue(parts);
+      }
+      var normalizedArray = [];
+      if (typeof target.iterator == "function") {
+        var it = target.iterator();
+        while (it.hasNext()) {
+          var item = it.next();
+          if (item != null && item != undefined) {
+            var splitItem = item.toString().split(/[,;]/);
+            for(var idx = 0; idx < splitItem.length; idx++) {
+              var finalItem = splitItem[idx].toString().toLowerCase().trim();              
+              if (finalItem.length > 0) {
+                normalizedArray.push(finalItem);
+              }
+            }
+          }
+        }
+      } else if (Array.isArray(target)) {
+        for (var i = 0; i < target.length; i++) {
+          var item2 = target[i];
+          if (item2 != null && item2 != undefined) {
+            var splitItem2 = item2.toString().split(/[,;]/);
+            for(var idx2 = 0; idx2 < splitItem2.length; idx2++) {
+              var finalItem2 = splitItem2[idx2].toString().toLowerCase().trim();              
+              if (finalItem2.length > 0) {
+                normalizedArray.push(finalItem2);
+              }
+            }
+          }
+        }
+      } else {
+        // Single value ultra-fallback; should never get here, but lets be safe
+        print('WARNING: Attribute value for key "' + key + '" is a single non-iterable/non-array value; normalizing as string.');
+        var splitItem3 = target.toString().split(/[,;]/);
+        for(var idx3 = 0; idx3 < splitItem3.length; idx3++) {
+          var finalItem3 = splitItem3[idx3].toString().toLowerCase().trim();
+          if (finalItem3.length > 0) {
+            normalizedArray.push(finalItem3);
+          }
+        }
+      }
+      return normalizedArray;
+    };
     // If not key or not attributes or attributes are not object, return null
     if (!key || !attributes  || typeof attributes !== "object") return null;
     // Fast path: exact key
     if (typeof attributes.get == "function") {
       var direct = attributes.get(key);
-      if (direct != null && direct != undefined) return direct;
+      if (direct != null && direct != undefined) return normalizeFinalValue(direct);
 
       // Case-insensitive scan for java.util.Map
       if (typeof attributes.keySet == "function") {
@@ -80,13 +112,13 @@ try {
         while (it.hasNext()) {
           var k = it.next();
           if (k != null && k.toString().toLowerCase().trim() == normalizedKey) {
-            return attributes.get(k);
+            return normalizeFinalValue(attributes.get(k));
           }
         }
       }
     } else {
       // JS object fallback
-      if (attributes.hasOwnProperty && attributes.hasOwnProperty(key)) return attributes[key];
+      if (attributes.hasOwnProperty && attributes.hasOwnProperty(key)) return normalizeFinalValue(attributes[key]);
 
       // Case-insensitive scan for JS object keys (ES5-safe)
       var normalized = key.toString().toLowerCase().trim();
@@ -94,7 +126,7 @@ try {
       for (var i = 0; i < keys.length; i++) {
         var k2 = keys[i];
         if (k2 != null && k2.toString().toLowerCase().trim() == normalized) {
-          return attributes[k2];
+          return normalizeFinalValue(attributes[k2]);
         }
       }
     }
@@ -152,8 +184,7 @@ try {
       throw new Error('No scopes found in permission');
     }
     // Attributes are typically a java.util.Map<String, java.util.Set<String>>
-    var attrs = resource.getAttributes ? resource.getAttributes() : null;
-    debugMessage("-=-=-=-=-=-=--=-=-=-=--=-=-=-=-=- attrs type=" + (attrs ? attrs.getClass ? attrs.getClass() : typeof attrs : "null") + " -=-=-=-=-=-=--=-=-=-=--=-=-=-=-=-");
+    var attrs = resource.getAttributes ? resource.getAttributes() : null;    
 
     var readers = getAttrValues(attrs, "readers");
     var writers = getAttrValues(attrs, "writers");

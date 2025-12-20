@@ -1,6 +1,6 @@
-const debugMessage = function(/*message*/) {
+const debugMessage = function(message) {
   // Uncomment the line below to enable debug logging
-  // print('[case-file:acl] ' + message);
+  print('[case-file:acl] ' + message);
 };
 
 debugMessage('------------------------------------ [case-file:acl]: Begin ------------------------------------');

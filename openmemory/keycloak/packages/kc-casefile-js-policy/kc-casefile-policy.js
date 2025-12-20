@@ -1,5 +1,5 @@
 // Set to 'true' to enable debug messages in the Keycloak server log.
-var ENABLE_KC_POLICY_DEBUG = true;
+var ENABLE_KC_POLICY_DEBUG = false;
 
 var debugMessage = function(message) {
   if (ENABLE_KC_POLICY_DEBUG) {

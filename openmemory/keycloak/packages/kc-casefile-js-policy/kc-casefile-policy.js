@@ -1,6 +1,10 @@
+// Set to 'true' to enable debug messages in the Keycloak server log.
+var ENABLE_KC_POLICY_DEBUG = true;
+
 var debugMessage = function(message) {
-  // Uncomment the line below to enable debug logging
-  print('[case-file:acl] ' + message);
+  if (ENABLE_KC_POLICY_DEBUG) {
+    print('[case-file:acl] ' + message);
+  } 
 };
 
 debugMessage('------------------------------------ [case-file:acl]: Begin ------------------------------------');
@@ -9,7 +13,7 @@ try {
   // Per-scope authorization check
   var isAllowedForScope = function(scopeName, userId, readers, writers, admins) {
     if (!userId) return false;
-    // Works with java.util.Collection / Set / List (iterator) and JS arrays
+    // Expects values to be a normalized array, but getAttrValues does that for us
     var containsUser = function(values)  {
       if (!values) return false;
       // Values were normalized on the way in - we have an array of lower-case trimmed strings.
@@ -47,10 +51,11 @@ try {
     // Unknown scope -> skip
     return null;
   };
-  // Map-like or object-like case-insensitive attribute lookup
+  // Takes in a map or object-like input and returns the value of the given key 
+  // as a normalized array of lower-case trimmed and flattened strings.
   var getAttrValues = function(attributes, key) {
     // Normalize final value into a flattened array of lower-case trimmed strings
-    const normalizeFinalValue = function(target) {
+    var normalizeFinalValue = function(target) {
       if (target == null || target == undefined) return null;      
       // If we have a raw string, split on commas or ';' and then recursively normalize
       if (typeof target == 'string') {
@@ -134,6 +139,7 @@ try {
     print('WARNING: Attribute key "' + key + '" not found in resource attributes.');
     return null;
   };
+  // BEGIN Retrieve contextual information
   var context = $evaluation.getContext(),
       identity = undefined,
       userId = undefined,
@@ -151,47 +157,45 @@ try {
     }
   } else {
     throw new Error('No identity found in context');      
-  } 
+  }
   var permission = $evaluation.getPermission();
   if (permission) {
     var res = permission.getResource ? permission.getResource() : undefined;
     if (res) {
       resource = res;
-      debugMessage('got resource: ' + resource.getName());
       var oId = resource.getOwner();
       ownerId = oId ? oId.toString().toLowerCase().trim() : undefined;
-      debugMessage('got ownerId: ' + (ownerId || 'none'));
     } else {      
       throw new Error('No resource found in permission');
     }
   } else {
     throw new Error('No permission found in evaluation');    
   }
-
+  // BEGIN ACL Evaluation
   debugMessage('Evaluating ACLs');      
   if (ownerId && ownerId == userId) {
     // 1) Owner always allowed
     debugMessage('User is owner: Grant');
     $evaluation.grant();
   } else if (typeof identity.hasRealmRole == 'function' && identity.hasRealmRole("case-file:global-admin")) {
-    // 2) global admin role    
+    // 2) Global Admin role always allowed
     debugMessage('User has global admin role: Grant');
     $evaluation.grant();
   } else { 
-    // 3) Evaluate ACL attributes
+    // 3) Evaluate scopes against ACLs for this user id
     var scopes = permission.getScopes();
     if (scopes == null || scopes.isEmpty()) {
       throw new Error('No scopes found in permission');
     }
     // Attributes are typically a java.util.Map<String, java.util.Set<String>>
     var attrs = resource.getAttributes ? resource.getAttributes() : null;    
-
+    // So we flatten and normalize them for easier comparisons
     var readers = getAttrValues(attrs, "readers");
     var writers = getAttrValues(attrs, "writers");
     var admins  = getAttrValues(attrs, "admins");
     
     var anyOk = false;
-
+    // Evaluate each requested scope
     debugMessage('Evaluating scopes:');
     var it = scopes.iterator();
     while (it.hasNext()) {
@@ -223,7 +227,7 @@ try {
   }  
 } catch (e) {
   var errMsg = e && e.message ? e.message : e;
-  debugMessage('!!!!XxXxXxXxXxXxXxXxXx: Error evaluating case ACL: ' + errMsg + ' :XxXxXxXxXxXxXxXxXx!!!');
+  debugMessage('!!!!XxXxXxXxXxXxXxXxXx!!! Error evaluating case ACL: ' + errMsg + ' !!!XxXxXxXxXxXxXxXxXx!!!');
   // Fail safe- deny
   $evaluation.deny();
 }

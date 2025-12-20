@@ -6,7 +6,6 @@ var debugMessage = function(message) {
 debugMessage('------------------------------------ [case-file:acl]: Begin ------------------------------------');
 
 try {
-  debugMessage('Defining helper functions');
   // Per-scope authorization check
   var isAllowedForScope = function(scopeName, userId, readers, writers, admins) {
     if (!userId) return false;
@@ -15,6 +14,7 @@ try {
       if (!values) return false;
       // If we have a raw string, split on commas or ';'
       if (typeof values == 'string') {
+        debugMessage('*** Checking ACL item: ' + values + ' against userId: ' + userId);
         // And then send back through to catch the array case
         return containsUser(values.toString().split(/[,;]/));
       }
@@ -22,12 +22,16 @@ try {
         var it = values.iterator();
         while (it.hasNext()) {
           var checkItem = it.next();
-          if (checkItem && checkItem.toString().toLowerCase().trim() == userId) return true;      
-        }
+          if (!checkItem) continue;
+          var normalizedCheckItem = checkItem.toString().toLowerCase().trim();
+          debugMessage('*** Checking ACL item: ' + normalizedCheckItem + ' against userId: ' + userId);
+          if (normalizedCheckItem == userId) return true;      
+        }        
         return false;
       }
       if (Array.isArray(values)) {
         for (var i = 0; i < values.length; i++) {
+          debugMessage('*** Checking ACL item: ' + values[i] + ' against userId: ' + userId);
           if (values[i] && values[i].toString().toLowerCase().trim() == userId) return true;
         }
       } else {
@@ -98,8 +102,6 @@ try {
     print('WARNING: Attribute key "' + key + '" not found in resource attributes.');
     return null;
   };
-  debugMessage('Gathering Context');
-
   var context = $evaluation.getContext(),
       identity = undefined,
       userId = undefined,
@@ -118,7 +120,6 @@ try {
   } else {
     throw new Error('No identity found in context');      
   } 
-  debugMessage('got identity: ' + userId);      
   var permission = $evaluation.getPermission();
   if (permission) {
     var res = permission.getResource ? permission.getResource() : undefined;
@@ -165,6 +166,7 @@ try {
     while (it.hasNext()) {
       var s = it.next();
       var scopeName = (s && typeof s.getName == "function") ? s.getName() : s.toString();
+      debugMessage('Checking scope "' + scopeName + '"...');
       var ok = isAllowedForScope(scopeName, userId, readers, writers, admins);
 
       if (ok == null || ok == undefined) {
@@ -184,13 +186,13 @@ try {
       debugMessage('All requested case file scopes allowed: Grant');
       $evaluation.grant();    
     } else {
-      debugMessage('No matching ACLs found: Default deny');
+      debugMessage('!!!-------- No matching ACLs found: Default deny --------!!!');
       $evaluation.deny();
     }         
   }  
 } catch (e) {
   var errMsg = e && e.message ? e.message : e;
-  debugMessage('Error evaluating case ACL: ' + errMsg);
+  debugMessage('!!!!XxXxXxXxXxXxXxXxXx: Error evaluating case ACL: ' + errMsg + ' :XxXxXxXxXxXxXxXxXx!!!');
   // Fail safe- deny
   $evaluation.deny();
 }

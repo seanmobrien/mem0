@@ -63,4 +63,6 @@ def get_build_info():
 __build_info__ = get_build_info()
 
 from mem0.client.main import AsyncMemoryClient, MemoryClient  # noqa
+__build_stamp__ = "local.20260517.081338.15ac7d61"
+__build_type__ = "local"
 from mem0.memory.main import AsyncMemory, Memory  # noqa

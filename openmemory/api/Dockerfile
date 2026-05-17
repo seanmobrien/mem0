@@ -60,8 +60,16 @@ RUN pip install /tmp/*.whl && \
 # Install test dependencies and run tests before final image
 COPY --link=true openmemory/api/requirements-test.txt .
 COPY --link=true openmemory/api/ .
-COPY --link=true tests/ ./tests/
-#RUN pip install -r requirements-test.txt && pytest tests && rm -rf tests/ && find . -type f -name 'test_*.py' -delete
+COPY --link=true tests/__init__.py ./tests/__init__.py
+COPY --link=true tests/test_main.py ./tests/test_main.py
+COPY --link=true tests/test_memory.py ./tests/test_memory.py
+COPY --link=true tests/test_telemetry.py ./tests/test_telemetry.py
+COPY --link=true tests/api/ ./tests/api/
+COPY --link=true tests/configs/ ./tests/configs/
+COPY --link=true tests/memory/ ./tests/memory/
+COPY --link=true tests/utils/ ./tests/utils/
+RUN pip install -r requirements-test.txt && pytest tests && \
+    rm -rf tests/ && find . -type f -name 'test_*.py' -delete
 
 # Fix ownership of copied files and switch to non-root user
 RUN chown -R appuser:appuser /usr/src/openmemory

@@ -41,7 +41,8 @@ docker run --rm \
     -e CERTMGR_RENEWAL_MODE="${CERTMGR_RENEWAL_MODE:-false}" \
     -e CERTMGR_STAGING="${CERTMGR_STAGING:-false}" \
     -e CERTMGR_KEEPALIVE="${CERTMGR_KEEPALIVE:-false}" \
-    openmemory/certbot-azure
+    schoollawregistry.azurecr.io/openmemory-certbot-azure:local-build
+    #schoollawregistry.azurecr.io/openmemory-certbot-azure:implementation-school-law
 
 echo "Certificate management completed!"
 echo "Certificates are available in: $CERTS_DIR"

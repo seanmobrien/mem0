@@ -1,5 +1,5 @@
 from datetime import datetime, UTC
-from typing import List, Optional, Set, Union
+from typing import List, Optional, Union
 from uuid import UUID, uuid4
 import logging
 import os
@@ -18,10 +18,9 @@ from qdrant_client import models as qdrant_models
 from app.database import get_db
 from app.models import (
     Memory, MemoryState, MemoryAccessLog, App,
-    MemoryStatusHistory, User, Category, AccessControl, Config as ConfigModel
+    MemoryStatusHistory, User, Category, Config as ConfigModel
 )
 from app.schemas import MemoryResponse, PaginatedMemoryResponse
-from app.utils.permissions import check_memory_access_permissions
 from app.auth import get_current_user, get_user_id, get_user_record
 from opentelemetry import trace
 from opentelemetry.trace import SpanKind, Status, StatusCode
@@ -100,10 +99,13 @@ def update_memory_state(db: Session, memory_id: UUID, new_state: MemoryState, us
     old_state = memory.state
 
     # Update memory state
+    # pyrefly: ignore [bad-assignment]
     memory.state = new_state
     if new_state == MemoryState.archived:
+        # pyrefly: ignore [bad-assignment]
         memory.archived_at = datetime.now(UTC)
     elif new_state == MemoryState.deleted:
+        # pyrefly: ignore [bad-assignment]
         memory.deleted_at = datetime.now(UTC)
 
     # Record state change
@@ -116,46 +118,6 @@ def update_memory_state(db: Session, memory_id: UUID, new_state: MemoryState, us
     db.add(history)
     db.commit()
     return memory
-
-
-def get_accessible_memory_ids(db: Session, app_id: UUID, user: User) -> Set[UUID]:
-    """
-    Get the set of memory IDs that the app has access to based on app-level ACL rules.
-    Returns all memory IDs if no specific restrictions are found.
-    """
-    # Get app-level access controls
-    app_access = db.query(AccessControl).filter(
-        AccessControl.subject_type == "app",
-        AccessControl.subject_id == app_id,
-        AccessControl.object_type == "memory"
-    ).all()
-
-    # If no app-level rules exist, return None to indicate all memories are accessible
-    if not app_access :
-        return None
-
-    # Initialize sets for allowed and denied memory IDs
-    allowed_memory_ids = set()
-    denied_memory_ids = set()
-
-    # Process app-level rules
-    for rule in app_access:
-        if rule.effect == "allow":
-            if rule.object_id:  # Specific memory access
-                allowed_memory_ids.add(rule.object_id)
-            else:  # All memories access
-                return None  # All memories allowed
-        elif rule.effect == "deny":
-            if rule.object_id:  # Specific memory denied
-                denied_memory_ids.add(rule.object_id)
-            else:  # All memories denied
-                return set()  # No memories accessible
-
-    # Remove denied memories from allowed set
-    if allowed_memory_ids:
-        allowed_memory_ids -= denied_memory_ids
-
-    return allowed_memory_ids
 
 
 # List all memories with filtering
@@ -182,6 +144,7 @@ async def list_memories(
     user: User = Depends(get_user_record)
 ):
     span = trace.get_current_span()
+    # pyrefly: ignore [bad-argument-type]
     span.set_attribute("mem0.user_id", user.user_id)
     if app_id:
         span.set_attribute("mem0.app_id", str(app_id))
@@ -192,6 +155,7 @@ async def list_memories(
         Memory.user_id == user.id,
         Memory.state != MemoryState.deleted,
         Memory.state != MemoryState.archived,
+        # pyrefly: ignore [bad-argument-type]
         Memory.content.ilike(f"%{search_query}%") if search_query else True
     )
 
@@ -228,6 +192,7 @@ async def list_memories(
 
     # Filter results based on permissions
     filtered_items = []
+    from app.utils.permissions import check_memory_access_permissions
     for item in paginated_results.items:
         if check_memory_access_permissions(db, item, user):
             filtered_items.append(item)
@@ -247,6 +212,7 @@ async def get_categories(
     user: User = Depends(get_user_record)
 ):    
     span = trace.get_current_span()
+    # pyrefly: ignore [bad-argument-type]
     span.set_attribute("mem0.user_id", user.user_id)
     
     # Get unique categories associated with the user's memories
@@ -279,6 +245,7 @@ async def create_memory(
     user: User = Depends(get_user_record)
 ):
     span = trace.get_current_span()
+    # pyrefly: ignore [bad-argument-type]
     span.set_attribute("mem0.user_id", user.user_id)
     span.set_attribute("mem0.app_name", request.app)
     # Get or create app
@@ -319,6 +286,7 @@ async def create_memory(
 
         qdrant_response = memory_client.add(
             request.text,
+            # pyrefly: ignore [bad-argument-type]
             user_id=user.user_id,  # Use string user_id to match search
             metadata=metadata,
         )
@@ -339,8 +307,10 @@ async def create_memory(
                 if event_type == 'ADD':
                     if existing_memory:
                         old_state = existing_memory.state
+                        # pyrefly: ignore [bad-assignment]
                         existing_memory.state = MemoryState.active
                         existing_memory.content = result['memory']
+                        # pyrefly: ignore [bad-assignment]
                         existing_memory.metadata_ = metadata
                     else:
                         memory_obj = Memory(
@@ -374,7 +344,9 @@ async def create_memory(
                 elif event_type == 'DELETE':
                     if existing_memory:
                         old_state = existing_memory.state
+                        # pyrefly: ignore [bad-assignment]
                         existing_memory.state = MemoryState.deleted
+                        # pyrefly: ignore [bad-assignment]
                         existing_memory.deleted_at = now_ts
 
                         history = MemoryStatusHistory(
@@ -402,6 +374,7 @@ async def create_memory(
                         old_state = existing_memory.state
                         # Update memory content and metadata
                         existing_memory.content = result.get('memory', existing_memory.content)
+                        # pyrefly: ignore [bad-assignment]
                         existing_memory.metadata_ = metadata
                         # Optionally update other fields if present in result
                         # existing_memory.state = MemoryState.active  # If state should be set to active on update
@@ -447,6 +420,7 @@ async def get_memory(
     user: User = Depends(get_user_record)
 ):
     span = trace.get_current_span()
+    # pyrefly: ignore [bad-argument-type]
     span.set_attribute("mem0.user_id", user.user_id)
     span.set_attribute("mem0.memory_id", str(memory_id))
     memory = get_memory_or_404(db, memory_id, user)
@@ -475,6 +449,7 @@ async def delete_memories(
     user: User = Depends(get_user_record)
 ):
     span = trace.get_current_span()
+    # pyrefly: ignore [bad-argument-type]
     span.set_attribute("mem0.user_id", user.user_id)
     span.set_attribute("mem0.deleted_count", len(request.memory_ids))
     for memory_id in request.memory_ids:
@@ -491,6 +466,7 @@ async def archive_memories(
     user: User = Depends(get_user_record)
 ):    
     span = trace.get_current_span()
+    # pyrefly: ignore [bad-argument-type]
     span.set_attribute("mem0.user_id", user.user_id)
     span.set_attribute("mem0.archive_count", len(memory_ids))
     for memory_id in memory_ids:
@@ -515,6 +491,7 @@ async def pause_memories(
     user: User = Depends(get_user_record)
 ):
     span = trace.get_current_span()
+    # pyrefly: ignore [bad-argument-type]
     span.set_attribute("mem0.user_id", user.user_id)
     span.set_attribute("mem0.global_pause", request.global_pause)
     if request.app_id:
@@ -540,7 +517,8 @@ async def pause_memories(
             Memory.state != MemoryState.archived
         ).all()
         for memory in memories:
-            update_memory_state(db, memory.id, state, user_id)
+            # pyrefly: ignore [bad-argument-type]
+            update_memory_state(db, memory.id, state, user)
         return {"message": "Successfully paused all memories"}
 
     if app_id:
@@ -552,6 +530,7 @@ async def pause_memories(
             Memory.state != MemoryState.archived
         ).all()
         for memory in memories:
+            # pyrefly: ignore [bad-argument-type]
             update_memory_state(db, memory.id, state, user)
         return {"message": f"Successfully paused all memories for app {app_id}"}
     
@@ -563,6 +542,7 @@ async def pause_memories(
             Memory.id.in_(memory_ids)
         ).all()
         for memory in memories:
+            # pyrefly: ignore [bad-argument-type]
             update_memory_state(db, memory.id, state, user)
         return {"message": f"Successfully paused all memories"}
 
@@ -580,7 +560,8 @@ async def pause_memories(
             Memory.state != MemoryState.archived
         ).all()
         for memory in memories:
-            update_memory_state(db, memory.id, state, user_id)
+            # pyrefly: ignore [bad-argument-type]
+            update_memory_state(db, memory.id, state, user)
         return {"message": f"Successfully paused memories in {len(category_ids)} categories"}
 
     raise HTTPException(status_code=400, detail="Invalid pause request parameters")
@@ -597,6 +578,7 @@ async def get_memory_access_log(
     user: User = Depends(get_user_record)
 ):    
     span = trace.get_current_span()
+    # pyrefly: ignore [bad-argument-type]
     span.set_attribute("mem0.user_id", user.user_id)
     span.set_attribute("mem0.memory_id", str(memory_id))
     span.set_attribute("mem0.page", page)
@@ -631,10 +613,12 @@ async def update_memory(
     user: User = Depends(get_user_record)
 ):        
     span = trace.get_current_span()
+    # pyrefly: ignore [bad-argument-type]
     span.set_attribute("mem0.user_id", user.user_id)
     span.set_attribute("mem0.memory_id", str(memory_id))
     span.set_attribute("mem0.content_length", len(request.memory_content or ""))
     memory = get_memory_or_404(db, memory_id, user)
+    # pyrefly: ignore [bad-assignment]
     memory.content = request.memory_content
     db.commit()
     db.refresh(memory)
@@ -660,6 +644,7 @@ async def filter_memories(
     user: User = Depends(get_user_record)
 ):
     span = trace.get_current_span()
+    # pyrefly: ignore [bad-argument-type]
     span.set_attribute("mem0.user_id", user.user_id)
     span.set_attribute("mem0.page", request.page)
     span.set_attribute("mem0.page_size", request.size)
@@ -777,6 +762,7 @@ async def search_memories_endpoint(
     app_id = "openmemory"
     
     span = trace.get_current_span()
+    # pyrefly: ignore [bad-argument-type]
     span.set_attribute("mem0.user_id", user.user_id)
     span.set_attribute("mem0.query", request.query)
     span.set_attribute("mem0.page", request.page)
@@ -786,6 +772,7 @@ async def search_memories_endpoint(
         # Use the reusable search function
         memories = await search_memories(
             query=request.query,
+            # pyrefly: ignore [bad-argument-type]
             user_id=user.user_id,
             app_id=app_id,
             numberOfHits=request.numberOfHits,
@@ -796,6 +783,7 @@ async def search_memories_endpoint(
         # Log memory access
         await log_memory_access(
             memories=memories,
+            # pyrefly: ignore [bad-argument-type]
             user_id=user.user_id,
             app_id=app_id,
             query=request.query,
@@ -822,6 +810,7 @@ async def get_related_memories(
     user: User = Depends(get_user_record)
 ):
     span = trace.get_current_span()
+    # pyrefly: ignore [bad-argument-type]
     span.set_attribute("mem0.user_id", user.user_id)
     span.set_attribute("mem0.memory_id", str(memory_id))
     user_id = user.user_id

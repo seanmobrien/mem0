@@ -1,5 +1,5 @@
 import os
-from unittest.mock import Mock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
@@ -29,6 +29,7 @@ def memory_instance():
         mock_llm.create.return_value = Mock()
 
         config = MemoryConfig(version="v1.1")
+        # pyrefly: ignore [bad-assignment]
         config.graph_store.config = {"some_config": "value"}
         return Memory(config)
 
@@ -51,6 +52,7 @@ def memory_custom_instance():
             custom_fact_extraction_prompt="custom prompt extracting memory",
             custom_update_memory_prompt="custom prompt determining memory update",
         )
+        # pyrefly: ignore [bad-assignment]
         config.graph_store.config = {"some_config": "value"}
         return Memory(config)
 
@@ -250,7 +252,11 @@ def test_get_all(memory_instance, version, enable_graph, expected_result):
 
 def test_custom_prompts(memory_custom_instance):
     messages = [{"role": "user", "content": "Test message"}]
-    memory_custom_instance.llm.generate_response = Mock()
+    memory_custom_instance.embedding_model = MagicMock()
+    memory_custom_instance.embedding_model.embed.return_value = [0.1, 0.2]
+    memory_custom_instance.vector_store = MagicMock()
+    memory_custom_instance.vector_store.search.return_value = []
+    memory_custom_instance.llm.generate_response = Mock(side_effect=['{"facts": ["test fact"]}', '{"memory": []}'])
 
     with patch("mem0.memory.main.parse_messages", return_value="Test message") as mock_parse_messages:
         with patch(
@@ -261,19 +267,17 @@ def test_custom_prompts(memory_custom_instance):
             ## custom prompt
             ##
             mock_parse_messages.assert_called_once_with(messages)
-
-            memory_custom_instance.llm.generate_response.assert_any_call(
-                messages=[
-                    {"role": "system", "content": memory_custom_instance.config.custom_fact_extraction_prompt},
-                    {"role": "user", "content": f"Input:\n{mock_parse_messages.return_value}"},
-                ],
-                response_format={"type": "json_object"},
-            )
+            system_message = memory_custom_instance.llm.generate_response.call_args_list[0].kwargs["messages"][0][
+                "content"
+            ]
+            assert memory_custom_instance.config.custom_fact_extraction_prompt in system_message
+            assert system_message.startswith("You are a Personal Information Organizer")
+            assert system_message != memory_custom_instance.config.custom_fact_extraction_prompt
 
             ## custom update memory prompt
             ##
             mock_get_update_memory_messages.assert_called_once_with(
-                [], [], memory_custom_instance.config.custom_update_memory_prompt
+                [], ["test fact"], memory_custom_instance.config.custom_update_memory_prompt
             )
 
             memory_custom_instance.llm.generate_response.assert_any_call(

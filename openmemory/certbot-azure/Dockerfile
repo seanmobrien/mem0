@@ -8,8 +8,8 @@ LABEL org.opencontainers.image.source="https://github.com/seanmobrien/mem0"
 # Switch to root for package installation
 USER root
 
-# Builder stage: produce wheels for Python packages on an Alpine-based Python image
-FROM python:3.12-alpine AS builder
+# Builder stage: produce wheels using the same runtime base as final image to avoid wheel ABI mismatch
+FROM certbot/certbot:latest AS builder
 RUN set -eux; \
     retry() { n=1; max=5; delay=5; until "$@"; do \
         if [ "$n" -ge "$max" ]; then \

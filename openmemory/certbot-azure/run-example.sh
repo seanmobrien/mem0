@@ -10,6 +10,25 @@ if [ -f ".env" ]; then
     set +a
 fi
 
+STAGE="${CERTMGR_STAGE:-}"
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --stage)
+            STAGE="${2:-}"
+            shift 2
+            ;;
+        --stage=*)
+            STAGE="${1#*=}"
+            shift
+            ;;
+        *)
+            echo "Unknown option: $1" >&2
+            echo "Usage: $0 [--stage <manual|export|upload>]" >&2
+            exit 1
+            ;;
+    esac
+done
+
 # Check if required environment variables are set
 if [ -z "$CERTMGR_DOMAIN" ]; then
     echo "Error: CERTMGR_DOMAIN is not set"
@@ -24,24 +43,42 @@ mkdir -p "$CERTS_DIR"
 echo "Starting certbot-azure container..."
 
 # Run the container
-docker run --rm \
-    -it \
-    -v "$CERTS_DIR:/mnt/secrets-output" \
-    -e CERTMGR_DOMAIN="$CERTMGR_DOMAIN" \
-    -e CERTMGR_EMAIL="$CERTMGR_EMAIL" \
-    -e CERTMGR_DESEC_TOKEN="$CERTMGR_DESEC_TOKEN" \
-    -e CERTMGR_CLOUDFLARE_EMAIL="$CERTMGR_CLOUDFLARE_EMAIL" \
-    -e CERTMGR_CLOUDFLARE_TOKEN="$CERTMGR_CLOUDFLARE_TOKEN" \
-    -e CERTMGR_DNS_PROVIDER="${CERTMGR_DNS_PROVIDER:-auto}" \
-    -e CERTMGR_AZURE_TENANT_ID="$CERTMGR_AZURE_TENANT_ID" \
-    -e CERTMGR_AZURE_CLIENT_ID="$CERTMGR_AZURE_CLIENT_ID" \
-    -e CERTMGR_AZURE_CLIENT_SECRET="$CERTMGR_AZURE_CLIENT_SECRET" \
-    -e CERTMGR_AZURE_KEYVAULT_NAME="$CERTMGR_AZURE_KEYVAULT_NAME" \
-    -e CERTMGR_AZURE_CERT_NAME="$CERTMGR_AZURE_CERT_NAME" \
-    -e CERTMGR_RENEWAL_MODE="${CERTMGR_RENEWAL_MODE:-false}" \
-    -e CERTMGR_STAGING="${CERTMGR_STAGING:-false}" \
-    -e CERTMGR_KEEPALIVE="${CERTMGR_KEEPALIVE:-false}" \
+docker_args=(
+    run
+    --rm
+    -v "$CERTS_DIR:/mnt/secrets-output"
+    -e "CERTMGR_DOMAIN=$CERTMGR_DOMAIN"
+    -e "CERTMGR_EMAIL=$CERTMGR_EMAIL"
+    -e "CERTMGR_DESEC_TOKEN=$CERTMGR_DESEC_TOKEN"
+    -e "CERTMGR_CLOUDFLARE_EMAIL=$CERTMGR_CLOUDFLARE_EMAIL"
+    -e "CERTMGR_CLOUDFLARE_TOKEN=$CERTMGR_CLOUDFLARE_TOKEN"
+    -e "CERTMGR_DNS_PROVIDER=${CERTMGR_DNS_PROVIDER:-auto}"
+    -e "CERTMGR_AZURE_TENANT_ID=$CERTMGR_AZURE_TENANT_ID"
+    -e "CERTMGR_AZURE_CLIENT_ID=$CERTMGR_AZURE_CLIENT_ID"
+    -e "CERTMGR_AZURE_CLIENT_SECRET=$CERTMGR_AZURE_CLIENT_SECRET"
+    -e "CERTMGR_AZURE_KEYVAULT_NAME=$CERTMGR_AZURE_KEYVAULT_NAME"
+    -e "CERTMGR_AZURE_CERT_NAME=$CERTMGR_AZURE_CERT_NAME"
+)
+
+if [ -n "$STAGE" ]; then
+    docker_args+=(-e "CERTMGR_STAGE=$STAGE")
+fi
+
+if [ "${STAGE,,}" = "manual" ]; then
+    docker_args+=(-it)
+fi
+
+docker_args+=(
+    -e "CERTMGR_RENEWAL_MODE=${CERTMGR_RENEWAL_MODE:-false}"
+    -e "CERTMGR_STAGING=${CERTMGR_STAGING:-false}"
+    -e "CERTMGR_KEEPALIVE=${CERTMGR_KEEPALIVE:-false}"
     schoollawregistry.azurecr.io/openmemory-certbot-azure:local-build
+)
+
+if ! docker "${docker_args[@]}"; then
+    echo "Certificate management failed!" >&2
+    exit 1
+fi
     #schoollawregistry.azurecr.io/openmemory-certbot-azure:implementation-school-law
 
 echo "Certificate management completed!"

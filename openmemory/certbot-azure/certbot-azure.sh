@@ -1,3 +1,9 @@
+    # Ensure the parent domain directory exists for the PFX file
+    local pfx_dir="/etc/letsencrypt/$upload_domain"
+    if [ ! -d "$pfx_dir" ]; then
+        log_info "Creating directory for PFX output: $pfx_dir"
+        mkdir -p "$pfx_dir"
+    fi
 #!/bin/bash
 set -euo pipefail
 
@@ -133,7 +139,7 @@ Optional:
   --stage <manual|export|upload>  Start from specific stage (CERTMGR_STAGE)
   --help                          Show this help
 EOF
-} n
+}
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -451,7 +457,10 @@ request_certificate_manual() {
     fi
 
     local certbot_cmd="certbot certonly -v --manual --preferred-challenges dns"
-    certbot_cmd="$certbot_cmd --manual-public-ip-logging-ok"
+    # Newer certbot releases removed this flag; only add it when supported.
+    if certbot --help all 2>/dev/null | grep -q -- "--manual-public-ip-logging-ok"; then
+        certbot_cmd="$certbot_cmd --manual-public-ip-logging-ok"
+    fi
     certbot_cmd="$certbot_cmd --email $EMAIL"
     certbot_cmd="$certbot_cmd --domain $DOMAIN"
 
@@ -476,27 +485,34 @@ request_certificate_manual() {
 
 export_certificates() {
     log_info "Exporting certificates to /mnt/secrets-output"
-    
+
+    # Use parent domain for wildcard certs
+    local export_domain="$DOMAIN"
+    if [[ "$export_domain" == \*.* ]]; then
+        export_domain="${export_domain#*.}"
+        log_info "Detected wildcard domain. Using parent domain for export: $export_domain"
+    fi
+
     # Determine certificate path
-    local cert_path="/etc/letsencrypt/live/$DOMAIN"
-    
+    local cert_path="/etc/letsencrypt/live/$export_domain"
+
     if [ ! -d "$cert_path" ]; then
         log_error "Certificate directory not found: $cert_path"
         error_exit
     fi
-    
+
     # Copy certificates to output directory
     cp "$cert_path/fullchain.pem" "/mnt/secrets-output/fullchain.pem"
     cp "$cert_path/privkey.pem" "/mnt/secrets-output/privkey.pem"
     cp "$cert_path/cert.pem" "/mnt/secrets-output/cert.pem"
     cp "$cert_path/chain.pem" "/mnt/secrets-output/chain.pem"
-    
+
     # Set permissions
     chmod 644 /mnt/secrets-output/fullchain.pem
     chmod 644 /mnt/secrets-output/cert.pem
     chmod 644 /mnt/secrets-output/chain.pem
     chmod 600 /mnt/secrets-output/privkey.pem
-    
+
     log_success "Certificates exported to /mnt/secrets-output"
 }
 
@@ -516,17 +532,24 @@ upload_to_azure_keyvault() {
     
     log_info "Uploading certificate to Azure Key Vault: $AZURE_KEYVAULT_NAME"
     
+    # Use parent domain for wildcard certs (match export_certificates logic)
+    local upload_domain="$DOMAIN"
+    if [[ "$upload_domain" == \*.* ]]; then
+        upload_domain="${upload_domain#*.}"
+        log_info "Detected wildcard domain. Using parent domain for upload: $upload_domain"
+    fi
+
     # Create PFX file from certificate and private key
-    local pfx_file="/etc/letsencrypt/$DOMAIN/certificate.pfx"
+    local pfx_file="/etc/letsencrypt/$upload_domain/certificate.pfx"
     local pfx_password
     pfx_password=$(openssl rand -base64 32)
-    
+
     # Prefer certificates exported to mounted secrets, fallback to certbot live path
     local privkey_path="/mnt/secrets-output/privkey.pem"
     local fullchain_path="/mnt/secrets-output/fullchain.pem"
     if [[ ! -f "$privkey_path" || ! -f "$fullchain_path" ]]; then
-        privkey_path="/etc/letsencrypt/live/$DOMAIN/privkey.pem"
-        fullchain_path="/etc/letsencrypt/live/$DOMAIN/fullchain.pem"
+        privkey_path="/etc/letsencrypt/live/$upload_domain/privkey.pem"
+        fullchain_path="/etc/letsencrypt/live/$upload_domain/fullchain.pem"
     fi
 
     # Convert to PFX format

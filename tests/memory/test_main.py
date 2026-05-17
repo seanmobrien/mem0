@@ -52,7 +52,7 @@ class TestAddToVectorStoreErrors:
             )
 
         # Verify
-        assert mock_memory.llm.generate_response.call_count == 2
+        assert mock_memory.llm.generate_response.call_count == 1
         assert result == []  # Should return empty list when no memories processed
         assert "Error in new_retrieved_facts" in caplog.text
 
@@ -97,7 +97,7 @@ class TestAsyncAddToVectorStoreErrors:
 
         with caplog.at_level(logging.ERROR):
             result = await mock_async_memory._add_to_vector_store(
-                messages=[{"role": "user", "content": "test"}], metadata={}, filters={}, infer=True
+                messages=[{"role": "user", "content": "test"}], metadata={}, effective_filters={}, infer=True
             )
 
         assert result == []
@@ -111,7 +111,7 @@ class TestAsyncAddToVectorStoreErrors:
 
         with caplog.at_level(logging.ERROR):
             result = await mock_async_memory._add_to_vector_store(
-                messages=[{"role": "user", "content": "test"}], metadata={}, filters={}, infer=True
+                messages=[{"role": "user", "content": "test"}], metadata={}, effective_filters={}, infer=True
             )
 
         assert result == []

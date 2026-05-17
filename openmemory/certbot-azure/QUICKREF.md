@@ -49,6 +49,29 @@ docker run -it --rm -v ./certs:/mnt/secrets-output \
   openmemory/certbot-azure
 ```
 
+### Manual Certificate Generation
+Use this when you want Certbot to prompt you for the DNS TXT record manually instead of auto-detecting a DNS provider:
+
+```bash
+docker run -it --rm -v ./certs:/mnt/secrets-output \
+  -e CERTMGR_DOMAIN=example.com \
+  -e CERTMGR_EMAIL=admin@example.com \
+  -e CERTMGR_AZURE_TENANT_ID=<tenant-id> \
+  -e CERTMGR_AZURE_CLIENT_ID=<client-id> \
+  -e CERTMGR_AZURE_CLIENT_SECRET=<secret> \
+  -e CERTMGR_AZURE_KEYVAULT_NAME=<vault-name> \
+  -e CERTMGR_AZURE_CERT_NAME=<cert-name> \
+  -e CERTMGR_STAGING=true \
+  -e CERTMGR_STAGE=manual \
+  openmemory/certbot-azure
+```
+
+Notes:
+- `--stage manual` starts at the interactive Certbot DNS challenge flow.
+- The container must be run with `-it` so you can copy the TXT record instructions from Certbot.
+- After validation succeeds, the script exports `fullchain.pem`, `privkey.pem`, `cert.pem`, and `chain.pem` to `/mnt/secrets-output` and uploads the certificate to Azure Key Vault.
+- Add `-e CERTMGR_KEEPALIVE=true` if you want the container to stay open after completion for inspection.
+
 ## Environment Variables Reference
 
 | Variable | Required | Default | Example |

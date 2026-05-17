@@ -26,10 +26,10 @@ RUN set -eux; \
     retry python3 -m pip wheel --no-cache-dir --wheel-dir /wheels certbot-dns-desec certbot-dns-cloudflare==1.1.0 cloudflare==2.3.1  certbot-dns-freedns azure-cli; \
     # clean up build deps in builder (keeps builder small)
     apk del build-base gcc musl-dev libffi-dev python3-dev || true
-
-    # Final stage: start from certbot base again so we can COPY from the builder
-    FROM certbot/certbot:latest
-    USER root
+    
+# Final stage: start from certbot base again so we can COPY from the builder
+FROM certbot/certbot:latest
+USER root
 
     # Update package repositories and install runtime dependencies
 RUN set -eux; \
@@ -44,37 +44,27 @@ RUN set -eux; \
     retry apk add --no-cache bash curl ca-certificates jq openssl bind-tools
     # Update package repositories and install runtime dependencies
 
-# Install Python packages from wheels produced in the builder stage
-COPY --from=builder /wheels /wheels
-RUN set -eux; \
-    # install from local wheels to avoid network and compilation in final image
-    python3 -m pip install --no-cache-dir /wheels/*.whl; \
-    rm -rf /wheels
-
-# Create non-root user for running the application
-RUN addgroup -g 1000 certbot-user && \
-    adduser -D -u 1000 -G certbot-user certbot-user
-
-# Create mount point for secrets output (ownership may be adjusted at runtime by entrypoint)
-RUN mkdir -p /mnt/secrets-output && \
-    chown certbot-user:certbot-user /mnt/secrets-output || true
-
-# Create directory for certbot work
-RUN mkdir -p /var/lib/letsencrypt && \
-    mkdir -p /var/log/letsencrypt && \
-    mkdir -p /etc/letsencrypt && \
-    chown -R certbot-user:certbot-user /var/lib/letsencrypt /var/log/letsencrypt /etc/letsencrypt
-
 # Copy the certificate management script (keep owned by root; entrypoint will run it as certbot-user)
 COPY certbot-azure.sh /usr/local/bin/certbot-azure.sh
-RUN chmod +x /usr/local/bin/certbot-azure.sh
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh 
 
+# install from local wheels to avoid network and compilation in final image
+COPY --from=builder /wheels /wheels
+# Install Python packages from wheels produced in the builder stage
+# Create non-root user for running the application
+# Create mount point for secrets output (ownership may be adjusted at runtime by entrypoint)
+# Create directory for certbot work
 # Install su-exec (small tool to drop privileges cleanly) and copy entrypoint
-RUN set -eux; \
-    # su-exec is available in Alpine; ensure package repo updated earlier
-    apk add --no-cache su-exec || true
-COPY entrypoint.sh /usr/local/bin/entrypoint.sh
-RUN chmod +x /usr/local/bin/entrypoint.sh
+# su-exec is available in Alpine; ensure package repo updated earlier
+RUN addgroup -g 1000 certbot-user && \
+    adduser -D -u 1000 -G certbot-user certbot-user; \
+    set -eux; \
+    python3 -m pip install --no-cache-dir /wheels/*.whl; \
+    rm -rf /wheels; \
+    (mkdir -p /mnt/secrets-output /var/log/letsencrypt /var/lib/letsencrypt /etc/letsencrypt || true) && \    
+    (chown -R certbot-user:certbot-user /mnt/secrets-output /var/lib/letsencrypt /var/lib/letsencrypt /var/log/letsencrypt /etc/letsencrypt || true) && \
+    (chmod +x /usr/local/bin/entrypoint.sh /usr/local/bin/certbot-azure.sh || true) && \    
+    (apk add --no-cache su-exec || true)
 
 # Keep running as root for the entrypoint which can chown mounts; entrypoint will drop privileges
 WORKDIR /home/certbot-user

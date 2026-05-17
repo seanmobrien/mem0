@@ -92,7 +92,7 @@ try {
         }
       } else {
         // Single value ultra-fallback; should never get here, but lets be safe
-        print('WARNING: Attribute value for key "' + key + '" is a single non-iterable/non-array value; normalizing as string.');
+        debugMessage('WARNING: Attribute value for key "' + key + '" is a single non-iterable/non-array value; normalizing as string.');
         var splitItem3 = target.toString().split(/[,;]/);
         for(var idx3 = 0; idx3 < splitItem3.length; idx3++) {
           var finalItem3 = splitItem3[idx3].toString().toLowerCase().trim();
@@ -136,7 +136,7 @@ try {
       }
     }
     
-    print('WARNING: Attribute key "' + key + '" not found in resource attributes.');
+    debugMessage('WARNING: Attribute key "' + key + '" not found in resource attributes.');
     return null;
   };
   // BEGIN Retrieve contextual information

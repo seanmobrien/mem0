@@ -1,5 +1,5 @@
 from datetime import datetime, UTC
-from typing import List, Optional, Set, Union
+from typing import List, Optional, Union
 from uuid import UUID, uuid4
 import logging
 import os
@@ -18,7 +18,7 @@ from qdrant_client import models as qdrant_models
 from app.database import get_db
 from app.models import (
     Memory, MemoryState, MemoryAccessLog, App,
-    MemoryStatusHistory, User, Category, AccessControl, Config as ConfigModel
+    MemoryStatusHistory, User, Category, Config as ConfigModel
 )
 from app.schemas import MemoryResponse, PaginatedMemoryResponse
 from app.auth import get_current_user, get_user_id, get_user_record
@@ -118,48 +118,6 @@ def update_memory_state(db: Session, memory_id: UUID, new_state: MemoryState, us
     db.add(history)
     db.commit()
     return memory
-
-
-def get_accessible_memory_ids(db: Session, app_id: UUID, user: User) -> Set[UUID]:
-    """
-    Get the set of memory IDs that the app has access to based on app-level ACL rules.
-    Returns all memory IDs if no specific restrictions are found.
-    """
-    # Get app-level access controls
-    app_access = db.query(AccessControl).filter(
-        AccessControl.subject_type == "app",
-        AccessControl.subject_id == app_id,
-        AccessControl.object_type == "memory"
-    ).all()
-
-    # If no app-level rules exist, return None to indicate all memories are accessible
-    if not app_access :
-        # pyrefly: ignore [bad-return]
-        return None
-
-    # Initialize sets for allowed and denied memory IDs
-    allowed_memory_ids = set()
-    denied_memory_ids = set()
-
-    # Process app-level rules
-    for rule in app_access:
-        if rule.effect == "allow":
-            if rule.object_id:  # Specific memory access
-                allowed_memory_ids.add(rule.object_id)
-            else:  # All memories access
-                # pyrefly: ignore [bad-return]
-                return None  # All memories allowed
-        elif rule.effect == "deny":
-            if rule.object_id:  # Specific memory denied
-                denied_memory_ids.add(rule.object_id)
-            else:  # All memories denied
-                return set()  # No memories accessible
-
-    # Remove denied memories from allowed set
-    if allowed_memory_ids:
-        allowed_memory_ids -= denied_memory_ids
-
-    return allowed_memory_ids
 
 
 # List all memories with filtering
@@ -560,7 +518,7 @@ async def pause_memories(
         ).all()
         for memory in memories:
             # pyrefly: ignore [bad-argument-type]
-            update_memory_state(db, memory.id, state, user_id)
+            update_memory_state(db, memory.id, state, user)
         return {"message": "Successfully paused all memories"}
 
     if app_id:

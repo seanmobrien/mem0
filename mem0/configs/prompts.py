@@ -292,7 +292,7 @@ def get_update_memory_messages(retrieved_old_memory_dict, response_content, cust
     if custom_update_memory_prompt is None or custom_update_memory_prompt.strip() == "":
         update_mem_prompt = DEFAULT_UPDATE_MEMORY_PROMPT
     else:
-        update_mem_prompt = "\n".join([custom_update_memory_prompt, DEFAULT_UPDATE_MEMORY_PROMPT])
+        update_mem_prompt = "\n".join([DEFAULT_UPDATE_MEMORY_PROMPT, custom_update_memory_prompt])
 
     return f"""{update_mem_prompt}
 

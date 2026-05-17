@@ -282,13 +282,17 @@ def get_default_memory_config(expandSecrets: bool = True) -> dict:
             
     # Graph Store
     if not graphProvider is None:
+        graphDatabase = parse_environment_variable_value("env:GRAPH_DATABASE", None, expandSecrets = expandSecrets)
+        graphStoreConfig: dict = {
+            "url": parse_environment_variable_value("env:GRAPH_URI", expandSecrets = expandSecrets),
+            "username": parse_environment_variable_value("env:GRAPH_USERNAME", "neo4j", expandSecrets = expandSecrets),
+            "password": parse_environment_variable_value("env:GRAPH_PASSWORD", expandSecrets = expandSecrets),
+        }
+        if graphDatabase is not None:
+            graphStoreConfig["database"] = graphDatabase
         defaultValues["graph_store"] = {
             "provider": parse_environment_variable_value(graphProvider),
-            "config": {
-                "url": parse_environment_variable_value("env:GRAPH_URI", expandSecrets = expandSecrets),
-                "username": parse_environment_variable_value("env:GRAPH_USERNAME", "neo4j", expandSecrets = expandSecrets),
-                "password": parse_environment_variable_value("env:GRAPH_PASSWORD", expandSecrets = expandSecrets),
-            }
+            "config": graphStoreConfig
         }
 
     # Custom Fact Extraction and update prompts

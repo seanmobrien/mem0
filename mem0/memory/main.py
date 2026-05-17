@@ -129,6 +129,7 @@ class Memory(MemoryBase):
         )
         self.llm = LlmFactory.create(self.config.llm.provider, self.config.llm.config)
         self.db = SQLiteManager(self.config.history_db_path)
+        # pyrefly: ignore [missing-attribute]
         self.collection_name = self.config.vector_store.config.collection_name
         self.api_version = self.config.version
 
@@ -143,11 +144,15 @@ class Memory(MemoryBase):
             self.graph = MemoryGraph(self.config)
             self.enable_graph = True
         else:
+            # pyrefly: ignore [bad-assignment]
             self.graph = None
+        # pyrefly: ignore [missing-attribute]
         self.config.vector_store.config.collection_name = "mem0migrations"
         if self.config.vector_store.provider in ["faiss", "qdrant"]:
             provider_path = f"migrations_{self.config.vector_store.provider}"
+            # pyrefly: ignore [missing-attribute]
             self.config.vector_store.config.path = os.path.join(mem0_dir, provider_path)
+            # pyrefly: ignore [missing-attribute]
             os.makedirs(self.config.vector_store.config.path, exist_ok=True)
         self._telemetry_vector_store = VectorStoreFactory.create(
             self.config.vector_store.provider, self.config.vector_store.config
@@ -246,15 +251,19 @@ class Memory(MemoryBase):
             results = self._create_procedural_memory(messages, metadata=processed_metadata, prompt=prompt)
             return results
 
+        # pyrefly: ignore [missing-attribute]
         if self.config.llm.config.get("enable_vision"):
+            # pyrefly: ignore [missing-attribute]
             messages = parse_vision_messages(messages, self.llm, self.config.llm.config.get("vision_details"))
         else:
             messages = parse_vision_messages(messages)
 
+        # pyrefly: ignore [implicit-import]
         with concurrent.futures.ThreadPoolExecutor() as executor:
             future1 = executor.submit(self._add_to_vector_store, messages, processed_metadata, effective_filters, infer)
             future2 = executor.submit(self._add_to_graph, messages, effective_filters)
 
+            # pyrefly: ignore [bad-argument-type, implicit-import]
             concurrent.futures.wait([future1, future2])
 
             vector_store_result = future1.result()
@@ -319,7 +328,7 @@ class Memory(MemoryBase):
 
         system_prompt, user_prompt = get_fact_retrieval_messages(parsed_messages)
         if self.config.custom_fact_extraction_prompt:
-            system_prompt = "\n".join([system_prompt, self.config.custom_fact_extraction_prompt])
+            system_prompt = self.config.custom_fact_extraction_prompt
 
         response = self.llm.generate_response(
             messages=[
@@ -334,7 +343,6 @@ class Memory(MemoryBase):
             new_retrieved_facts = json.loads(response)["facts"]
         except Exception as e:
             logging.error(f"Error in new_retrieved_facts: {e}")
-            raise MemoryError(f"Error processing LLM response: {e}")
             new_retrieved_facts = []
 
         if not new_retrieved_facts:
@@ -378,7 +386,6 @@ class Memory(MemoryBase):
             )
         except Exception as e:
             logging.error(f"Error in new memory actions response: {e}")
-            raise MemoryError(f"Error processing LLM response: {e}")
             response = ""
 
         try:
@@ -386,7 +393,6 @@ class Memory(MemoryBase):
             new_memories_with_actions = json.loads(response)
         except Exception as e:
             logging.error(f"Invalid JSON response: {e}")
-            raise MemoryError(f"Error processing LLM response: {e}")
             new_memories_with_actions = {}
 
         returned_memories = []
@@ -459,6 +465,7 @@ class Memory(MemoryBase):
 
         return added_entities
 
+    # pyrefly: ignore [bad-override]
     def get(self, memory_id):
         """
         Retrieve a memory by ID.
@@ -502,6 +509,7 @@ class Memory(MemoryBase):
 
         return result_item
 
+    # pyrefly: ignore [bad-override]
     def get_all(
         self,
         *,
@@ -542,12 +550,14 @@ class Memory(MemoryBase):
             "mem0.get_all", self, {"limit": limit, "keys": keys, "encoded_ids": encoded_ids, "sync_type": "sync"}
         )
 
+        # pyrefly: ignore [implicit-import]
         with concurrent.futures.ThreadPoolExecutor() as executor:
             future_memories = executor.submit(self._get_all_from_vector_store, effective_filters, limit)
             future_graph_entities = (
                 executor.submit(self.graph.get_all, effective_filters, limit) if self.enable_graph else None
             )
 
+            # pyrefly: ignore [implicit-import]
             concurrent.futures.wait(
                 [future_memories, future_graph_entities] if future_graph_entities else [future_memories]
             )
@@ -657,12 +667,14 @@ class Memory(MemoryBase):
             },
         )
 
+        # pyrefly: ignore [implicit-import]
         with concurrent.futures.ThreadPoolExecutor() as executor:
             future_memories = executor.submit(self._search_vector_store, query, effective_filters, limit, threshold)
             future_graph_entities = (
                 executor.submit(self.graph.search, query, effective_filters, limit) if self.enable_graph else None
             )
 
+            # pyrefly: ignore [implicit-import]
             concurrent.futures.wait(
                 [future_memories, future_graph_entities] if future_graph_entities else [future_memories]
             )
@@ -723,6 +735,7 @@ class Memory(MemoryBase):
 
         return original_memories
 
+    # pyrefly: ignore [bad-override]
     def update(self, memory_id, data):
         """
         Update a memory by ID.
@@ -741,6 +754,7 @@ class Memory(MemoryBase):
         self._update_memory(memory_id, data, existing_embeddings)
         return {"message": "Memory updated successfully!"}
 
+    # pyrefly: ignore [bad-override]
     def delete(self, memory_id):
         """
         Delete a memory by ID.
@@ -787,6 +801,7 @@ class Memory(MemoryBase):
 
         return {"message": "Memories deleted successfully!"}
 
+    # pyrefly: ignore [bad-override]
     def history(self, memory_id):
         """
         Get the history of changes for a memory by ID.
@@ -982,6 +997,7 @@ class AsyncMemory(MemoryBase):
         )
         self.llm = LlmFactory.create(self.config.llm.provider, self.config.llm.config)
         self.db = SQLiteManager(self.config.history_db_path)
+        # pyrefly: ignore [missing-attribute]
         self.collection_name = self.config.vector_store.config.collection_name
         self.api_version = self.config.version
 
@@ -993,6 +1009,7 @@ class AsyncMemory(MemoryBase):
             self.graph = MemoryGraph(self.config)
             self.enable_graph = True
         else:
+            # pyrefly: ignore [bad-assignment]
             self.graph = None
 
         capture_event("mem0.init", self, {"sync_type": "async"})
@@ -1076,7 +1093,9 @@ class AsyncMemory(MemoryBase):
             )
             return results
 
+        # pyrefly: ignore [missing-attribute]
         if self.config.llm.config.get("enable_vision"):
+            # pyrefly: ignore [missing-attribute]
             messages = parse_vision_messages(messages, self.llm, self.config.llm.config.get("vision_details"))
         else:
             messages = parse_vision_messages(messages)
@@ -1152,7 +1171,7 @@ class AsyncMemory(MemoryBase):
         parsed_messages = parse_messages(messages)
         system_prompt, user_prompt = get_fact_retrieval_messages(parsed_messages)
         if self.config.custom_fact_extraction_prompt:
-            system_prompt = "\n".join([system_prompt, self.config.custom_fact_extraction_prompt])
+            system_prompt = self.config.custom_fact_extraction_prompt
 
         response = await asyncio.to_thread(
             self.llm.generate_response,
@@ -1163,13 +1182,12 @@ class AsyncMemory(MemoryBase):
             response = remove_code_blocks(response)
             new_retrieved_facts = json.loads(response)["facts"]
         except Exception as e:
+            logging.error(f"Error in new_retrieved_facts: {e}")
             new_retrieved_facts = []
 
         if not new_retrieved_facts:
             logger.info("No new facts retrieved from input. Skipping memory update LLM call.")
             return []
-            logging.error(f"Error in new_retrieved_facts: {e}")
-            new_retrieved_facts = []
 
         retrieved_old_memory = []
         new_message_embeddings = {}
@@ -1218,14 +1236,12 @@ class AsyncMemory(MemoryBase):
             response = remove_code_blocks(response)
             new_memories_with_actions = json.loads(response)
         except Exception as e:
+            logging.error(f"Invalid JSON response: {e}")
             new_memories_with_actions = {}
 
         if not new_memories_with_actions:
             logger.info("No new facts retrieved from input (async). Skipping memory update LLM call.")
             return []
-
-            logging.error(f"Invalid JSON response: {e}")
-            new_memories_with_actions = {}
 
         returned_memories = []
         try:
@@ -1305,6 +1321,7 @@ class AsyncMemory(MemoryBase):
 
         return added_entities
 
+    # pyrefly: ignore [bad-override]
     async def get(self, memory_id):
         """
         Retrieve a memory by ID asynchronously.
@@ -1348,6 +1365,7 @@ class AsyncMemory(MemoryBase):
 
         return result_item
 
+    # pyrefly: ignore [bad-override]
     async def get_all(
         self,
         *,
@@ -1391,13 +1409,16 @@ class AsyncMemory(MemoryBase):
             "mem0.get_all", self, {"limit": limit, "keys": keys, "encoded_ids": encoded_ids, "sync_type": "async"}
         )
 
+        # pyrefly: ignore [implicit-import]
         with concurrent.futures.ThreadPoolExecutor() as executor:
             future_memories = executor.submit(self._get_all_from_vector_store, effective_filters, limit)
             future_graph_entities = (
                 executor.submit(self.graph.get_all, effective_filters, limit) if self.enable_graph else None
             )
 
+            # pyrefly: ignore [implicit-import]
             concurrent.futures.wait(
+                # pyrefly: ignore [bad-argument-type]
                 [future_memories, future_graph_entities] if future_graph_entities else [future_memories]
             )
 
@@ -1510,6 +1531,7 @@ class AsyncMemory(MemoryBase):
         graph_task = None
         if self.enable_graph:
             if hasattr(self.graph.search, "__await__"):  # Check if graph search is async
+                # pyrefly: ignore [bad-argument-type]
                 graph_task = asyncio.create_task(self.graph.search(query, effective_filters, limit))
             else:
                 graph_task = asyncio.create_task(asyncio.to_thread(self.graph.search, query, effective_filters, limit))
@@ -1575,6 +1597,7 @@ class AsyncMemory(MemoryBase):
 
         return original_memories
 
+    # pyrefly: ignore [bad-override]
     async def update(self, memory_id, data):
         """
         Update a memory by ID asynchronously.
@@ -1594,6 +1617,7 @@ class AsyncMemory(MemoryBase):
         await self._update_memory(memory_id, data, existing_embeddings)
         return {"message": "Memory updated successfully!"}
 
+    # pyrefly: ignore [bad-override]
     async def delete(self, memory_id):
         """
         Delete a memory by ID asynchronously.
@@ -1644,6 +1668,7 @@ class AsyncMemory(MemoryBase):
 
         return {"message": "Memories deleted successfully!"}
 
+    # pyrefly: ignore [bad-override]
     async def history(self, memory_id):
         """
         Get the history of changes for a memory by ID asynchronously.

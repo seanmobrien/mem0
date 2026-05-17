@@ -212,6 +212,7 @@ def get_default_memory_config(expandSecrets: bool = True) -> dict:
     graphProvider = parse_environment_variable_value("env:MEM0_PROVIDER_GRAPHSTORE")
     customExtractionPrompt = parse_environment_variable_value("env:MEM0_EXTRACTION_PROMPT", None, expandSecrets)
     customUpdateMemoryPrompt = parse_environment_variable_value("env:MEM0_UPDATE_MEMORY_PROMPT", None, expandSecrets)
+    graphSkipDb = parse_environment_variable_value("env:bool:GRAPH_SKIP_DB", False, expandSecrets)
 
     defaultValues: dict = {
         "llm": {
@@ -231,6 +232,8 @@ def get_default_memory_config(expandSecrets: bool = True) -> dict:
         },
         "version": "v1.1"
     }
+    if graphSkipDb is not None:
+        defaultValues["graph_skip_db"] = graphSkipDb
     temp = defaultValues["llm"]["config"]["temperature"]
     if isinstance(temp, float) and temp <= 0:    
         # Tricky, because 0 can be an actual intentional value.  Log and leave it be
@@ -367,7 +370,17 @@ def get_parsed_memory_config(custom_instructions: str | None = None, expandSecre
                 _copy_from_db(config, mem0_config, "llm")
                 _copy_from_db(config, mem0_config, "embedder")
                 _copy_from_db(config, mem0_config, "vector_store")
-                _copy_from_db(config, mem0_config, "graph_store")                
+                _copy_from_db(config, mem0_config, "graph_store")
+                if "graph_skip_db" in mem0_config and mem0_config["graph_skip_db"] is not None:
+                    config["graph_skip_db"] = mem0_config["graph_skip_db"]
+
+                # Allow callers to intentionally skip only the database name.
+                # The graph remains enabled; we just avoid passing a database value
+                # to the graph connection info when the flag is set.
+                if config.get("graph_skip_db") is True and isinstance(config.get("graph_store"), dict):
+                    graph_store_config = config["graph_store"].get("config", {})
+                    if isinstance(graph_store_config, dict):
+                        graph_store_config.pop("database", None)
             
             # All done!
             logger.debug("Configuration data has been successfully merged.")
@@ -399,14 +412,17 @@ def split_config(config: dict):
     """
     ret: dict[str, dict] = {}    
     # custom_instructions = config.pop("custom_fact_extraction_prompt", None)
-    ret["openmemory"] = dict([
-        ["custom_fact_extraction_prompt", config.get("custom_fact_extraction_prompt", None)],
-        ["custom_update_memory_prompt", config.get("custom_update_memory_prompt", None)]
-        # ["custom_instructions", config.get("custom_fact_extraction_prompt", None)],
-    ])
-    ret["mem0"] = dict([["llm", config.get("llm", {})],
-                        ["embedder", config.get("embedder", {})],
-                        ["vector_store", config.get("vector_store", {})],
-                        ["graph_store", config.get("graph_store", {})],
-                        ["version", config.get("version", "v1.1")]])
+    ret["openmemory"] = {
+        "custom_fact_extraction_prompt": config.get("custom_fact_extraction_prompt", None),
+        "custom_update_memory_prompt": config.get("custom_update_memory_prompt", None),
+        # "custom_instructions": config.get("custom_fact_extraction_prompt", None),
+    }
+    ret["mem0"] = {
+        "llm": config.get("llm", {}),
+        "embedder": config.get("embedder", {}),
+        "vector_store": config.get("vector_store", {}),
+        "graph_store": config.get("graph_store", None),
+        "graph_skip_db": config.get("graph_skip_db", None),
+        "version": config.get("version", "v1.1"),
+    }
     return ret

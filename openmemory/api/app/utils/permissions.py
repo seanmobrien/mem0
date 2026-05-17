@@ -2,6 +2,7 @@ from typing import Optional
 from uuid import UUID
 from sqlalchemy.orm import Session
 from app.models import Memory, App, MemoryState, User
+from app.routers.memories import get_accessible_memory_ids
 
 
 def check_memory_access_permissions(
@@ -42,7 +43,6 @@ def check_memory_access_permissions(
         return False
 
     # Check app-specific access controls
-    from app.routers.memories import get_accessible_memory_ids
     accessible_memory_ids = get_accessible_memory_ids(db, app_id, user)
 
     # If accessible_memory_ids is None, all memories are accessible

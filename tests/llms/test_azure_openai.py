@@ -95,7 +95,12 @@ def test_generate_response_with_tools(mock_openai_client):
     "default_headers",
     [None, {"Firstkey": "FirstVal", "SecondKey": "SecondVal"}],
 )
-def test_generate_with_http_proxies(default_headers):
+def test_generate_with_http_proxies(default_headers, monkeypatch):
+    # Clear Azure env vars so os.getenv() fallbacks in AzureOpenAILLM don't
+    # interfere when only api_key is supplied in azure_kwargs.
+    monkeypatch.delenv("LLM_AZURE_DEPLOYMENT", raising=False)
+    monkeypatch.delenv("LLM_AZURE_ENDPOINT", raising=False)
+    monkeypatch.delenv("LLM_AZURE_API_VERSION", raising=False)
     mock_http_client = Mock()
     mock_http_client_instance = Mock()
     mock_http_client.return_value = mock_http_client_instance

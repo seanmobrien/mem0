@@ -57,6 +57,10 @@ RUN pip install /tmp/*.whl && \
     adduser --disabled-password --gecos '' --uid 1000 appuser && \
     chown -R appuser:appuser /usr/src/openmemory /mnt/db
 
+# Install test dependencies and run tests before final image
+COPY --link=true openmemory/api/requirements-test.txt .
+RUN pip install -r requirements-test.txt && pytest tests && rm -rf tests/ && find . -type f -name 'test_*.py' -delete
+
 # Copy app files last (better cache invalidation for development)
 COPY --link=true openmemory/api/ .
 

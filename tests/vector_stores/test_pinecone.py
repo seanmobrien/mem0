@@ -2,7 +2,10 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from mem0.vector_stores.pinecone import PineconeDB
+try:
+    from mem0.vector_stores.pinecone import PineconeDB
+except ImportError:
+    pytest.skip("pinecone dependencies not installed", allow_module_level=True)
 
 
 @pytest.fixture
@@ -88,6 +91,7 @@ def test_get_vector_found(pinecone_db):
     # or a list of dictionaries, not a dictionary with an 'id' field
 
     # Create a mock Vector object
+    # pyrefly: ignore [missing-import]
     from pinecone.data.dataclasses.vector import Vector
 
     mock_vector = Vector(id="id1", values=[0.1] * 128, metadata={"name": "vector1"})

@@ -15,7 +15,6 @@ from app.database import SessionLocal
 from app.models import Memory, MemoryAccessLog
 from app.utils.db import get_user_and_app
 from app.utils.memory import get_memory_client
-from app.utils.permissions import check_memory_access_permissions
 from opentelemetry import trace
 from opentelemetry.trace import SpanKind, Status, StatusCode
 
@@ -70,8 +69,11 @@ async def search_memories(
     # Start a top-level span for the memory search operation
     with _TRACER.start_as_current_span("memory_client.search", kind=SpanKind.INTERNAL) as span:
         # Defensive coalescence for user-provided inputs
+        # pyrefly: ignore [unnecessary-type-conversion]
         user_id = "" if user_id is None else str(user_id)
+        # pyrefly: ignore [unnecessary-type-conversion]
         app_id = "" if app_id is None else str(app_id)
+        # pyrefly: ignore [unnecessary-type-conversion]
         query = "" if query is None else str(query)
         if not user_id:
             error = AssertionError("Error: user_id not provided")
@@ -88,12 +90,14 @@ async def search_memories(
 
         # Normalize pagination inputs to avoid downstream type errors when callers pass strings
         try:
+            # pyrefly: ignore [unnecessary-type-conversion]
             limit = int(numberOfHits)
         except (TypeError, ValueError):
             limit = 10
         limit = max(1, limit)
 
         try:
+            # pyrefly: ignore [unnecessary-type-conversion]
             page_number = int(page)
         except (TypeError, ValueError):
             page_number = 1
@@ -119,9 +123,11 @@ async def search_memories(
                 # Get accessible memory IDs based on ACL
                 with _TRACER.start_as_current_span("db.fetch_user_memories"):
                     user_memories = db.query(Memory).filter(Memory.user_id == user.id).all()
+                    from app.utils.permissions import check_memory_access_permissions
                     accessible_memory_ids = [
                         memory.id
                         for memory in user_memories
+                        # pyrefly: ignore [bad-argument-type]
                         if check_memory_access_permissions(db, memory, user, app_id=app.id)
                     ]
 
@@ -131,6 +137,7 @@ async def search_memories(
                 if accessible_memory_ids:
                     # Convert UUIDs to strings for Qdrant
                     accessible_memory_ids_str = [str(memory_id) for memory_id in accessible_memory_ids]
+                    # pyrefly: ignore [bad-argument-type]
                     conditions.append(qdrant_models.HasIdCondition(has_id=accessible_memory_ids_str))
 
                 # Create baseline filter
@@ -225,9 +232,13 @@ async def log_memory_access(
     """
     try:
         # Defensive coalescence for caller inputs
+        # pyrefly: ignore [unnecessary-type-conversion]
         user_id = "" if user_id is None else str(user_id)
+        # pyrefly: ignore [unnecessary-type-conversion]
         app_id = "" if app_id is None else str(app_id)
+        # pyrefly: ignore [unnecessary-type-conversion]
         query = "" if query is None else str(query)
+        # pyrefly: ignore [unnecessary-type-conversion]
         access_type = "search" if access_type is None else str(access_type) or "search"
 
         if memories is None:

@@ -99,6 +99,7 @@ class Mem0Config(BaseModel):
     embedder: Optional[EmbedderProvider] = None
     vector_store: Optional[VectorStoreConfig] = None
     graph_store: Optional[GraphStoreConfig] = None
+    graph_skip_db: Optional[bool] = None
     enable_graph: Optional[bool] = None
     version: Optional[str] = None
 

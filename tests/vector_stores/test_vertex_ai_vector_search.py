@@ -1,6 +1,12 @@
 from unittest.mock import Mock, patch
 
 import pytest
+
+try:
+    from mem0.vector_stores.vertex_ai_vector_search import GoogleMatchingEngine
+except (ImportError, ModuleNotFoundError):
+    pytest.skip("vertex_ai_vector_search dependencies not installed", allow_module_level=True)
+
 from google.api_core import exceptions
 from google.cloud.aiplatform.matching_engine.matching_engine_index_endpoint import (
     Namespace,
@@ -9,7 +15,6 @@ from google.cloud.aiplatform.matching_engine.matching_engine_index_endpoint impo
 from mem0.configs.vector_stores.vertex_ai_vector_search import (
     GoogleMatchingEngineConfig,
 )
-from mem0.vector_stores.vertex_ai_vector_search import GoogleMatchingEngine
 
 
 @pytest.fixture

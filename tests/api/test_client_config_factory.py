@@ -1,4 +1,3 @@
-import os
 import pytest
 from app.utils import client_config_factory
 

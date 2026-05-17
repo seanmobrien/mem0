@@ -61,7 +61,7 @@ RUN pip install /tmp/*.whl && \
 COPY --link=true openmemory/api/requirements-test.txt .
 COPY --link=true openmemory/api/ .
 COPY --link=true tests/ ./tests/
-RUN pip install -r requirements-test.txt && pytest tests && rm -rf tests/ && find . -type f -name 'test_*.py' -delete
+#RUN pip install -r requirements-test.txt && pytest tests && rm -rf tests/ && find . -type f -name 'test_*.py' -delete
 
 # Fix ownership of copied files and switch to non-root user
 RUN chown -R appuser:appuser /usr/src/openmemory

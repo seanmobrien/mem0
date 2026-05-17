@@ -561,7 +561,7 @@ async def pause_memories(
         ).all()
         for memory in memories:
             # pyrefly: ignore [bad-argument-type]
-            update_memory_state(db, memory.id, state, user_id)
+            update_memory_state(db, memory.id, state, user)
         return {"message": f"Successfully paused memories in {len(category_ids)} categories"}
 
     raise HTTPException(status_code=400, detail="Invalid pause request parameters")

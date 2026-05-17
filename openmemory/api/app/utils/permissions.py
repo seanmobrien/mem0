@@ -1,7 +1,42 @@
-from typing import Optional
+from typing import Optional, Set
 from uuid import UUID
 from sqlalchemy.orm import Session
-from app.models import Memory, App, MemoryState, User
+from app.models import Memory, App, MemoryState, User, AccessControl
+
+
+def get_accessible_memory_ids(db: Session, app_id: UUID, user: User) -> Optional[Set[UUID]]:
+    """
+    Get the set of memory IDs that the app has access to based on app-level ACL rules.
+    Returns None when all memories are accessible.
+    """
+    app_access = db.query(AccessControl).filter(
+        AccessControl.subject_type == "app",
+        AccessControl.subject_id == app_id,
+        AccessControl.object_type == "memory"
+    ).all()
+
+    if not app_access:
+        return None
+
+    allowed_memory_ids = set()
+    denied_memory_ids = set()
+
+    for rule in app_access:
+        if rule.effect == "allow":
+            if rule.object_id:
+                allowed_memory_ids.add(rule.object_id)
+            else:
+                return None
+        elif rule.effect == "deny":
+            if rule.object_id:
+                denied_memory_ids.add(rule.object_id)
+            else:
+                return set()
+
+    if allowed_memory_ids:
+        allowed_memory_ids -= denied_memory_ids
+
+    return allowed_memory_ids
 
 
 def check_memory_access_permissions(
@@ -42,7 +77,6 @@ def check_memory_access_permissions(
         return False
 
     # Check app-specific access controls
-    from app.routers.memories import get_accessible_memory_ids
     accessible_memory_ids = get_accessible_memory_ids(db, app_id, user)
 
     # If accessible_memory_ids is None, all memories are accessible

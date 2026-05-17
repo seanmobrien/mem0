@@ -1,3 +1,9 @@
+    # Ensure the parent domain directory exists for the PFX file
+    local pfx_dir="/etc/letsencrypt/$upload_domain"
+    if [ ! -d "$pfx_dir" ]; then
+        log_info "Creating directory for PFX output: $pfx_dir"
+        mkdir -p "$pfx_dir"
+    fi
 #!/bin/bash
 set -euo pipefail
 
@@ -91,23 +97,135 @@ trap 'on_error $LINENO' ERR
 # ============================================================================
 
 # Certificate configuration
-DOMAIN="${1:-${CERTMGR_DOMAIN}}"
-EMAIL="${2:-${CERTMGR_EMAIL}}"
-DESEC_TOKEN="${3:-${CERTMGR_DESEC_TOKEN}}"
-CLOUDFLARE_EMAIL="${4:-${CERTMGR_CLOUDFLARE_EMAIL}}"
-CLOUDFLARE_TOKEN="${5:-${CERTMGR_CLOUDFLARE_TOKEN}}"
+DOMAIN="${CERTMGR_DOMAIN:-}"
+EMAIL="${CERTMGR_EMAIL:-}"
+DESEC_TOKEN="${CERTMGR_DESEC_TOKEN:-}"
+CLOUDFLARE_EMAIL="${CERTMGR_CLOUDFLARE_EMAIL:-}"
+CLOUDFLARE_TOKEN="${CERTMGR_CLOUDFLARE_TOKEN:-}"
 
 # Azure configuration
-AZURE_TENANT_ID="${6:-${CERTMGR_AZURE_TENANT_ID}}"
-AZURE_CLIENT_ID="${7:-${CERTMGR_AZURE_CLIENT_ID}}"
-AZURE_CLIENT_SECRET="${8:-${CERTMGR_AZURE_CLIENT_SECRET}}"
-AZURE_KEYVAULT_NAME="${9:-${CERTMGR_AZURE_KEYVAULT_NAME}}"
-AZURE_CERT_NAME="${10:-${CERTMGR_AZURE_CERT_NAME}}"
+AZURE_TENANT_ID="${CERTMGR_AZURE_TENANT_ID:-}"
+AZURE_CLIENT_ID="${CERTMGR_AZURE_CLIENT_ID:-}"
+AZURE_CLIENT_SECRET="${CERTMGR_AZURE_CLIENT_SECRET:-}"
+AZURE_KEYVAULT_NAME="${CERTMGR_AZURE_KEYVAULT_NAME:-}"
+AZURE_CERT_NAME="${CERTMGR_AZURE_CERT_NAME:-}"
 
 # Optional configuration
-RENEWAL_MODE="${11:-${CERTMGR_RENEWAL_MODE:-false}}"
-STAGING="${12:-${CERTMGR_STAGING:-false}}"
-DNS_PROVIDER="${13:-${CERTMGR_DNS_PROVIDER:-auto}}"
+RENEWAL_MODE="${CERTMGR_RENEWAL_MODE:-false}"
+STAGING="${CERTMGR_STAGING:-false}"
+DNS_PROVIDER="${CERTMGR_DNS_PROVIDER:-auto}"
+RAW_STAGE="${CERTMGR_STAGE:-}"
+
+usage() {
+    cat <<EOF
+Usage: $0 [options]
+
+Required (or via env vars):
+  --domain <value>                Domain name (CERTMGR_DOMAIN)
+  --email <value>                 Let's Encrypt email (CERTMGR_EMAIL)
+  --azure-tenant-id <value>       Azure tenant ID (CERTMGR_AZURE_TENANT_ID)
+  --azure-client-id <value>       Azure client ID (CERTMGR_AZURE_CLIENT_ID)
+  --azure-client-secret <value>   Azure client secret (CERTMGR_AZURE_CLIENT_SECRET)
+  --azure-keyvault-name <value>   Azure Key Vault name (CERTMGR_AZURE_KEYVAULT_NAME)
+  --azure-cert-name <value>       Azure certificate name (CERTMGR_AZURE_CERT_NAME)
+
+Optional:
+  --desec-token <value>           deSEC token (CERTMGR_DESEC_TOKEN)
+  --cloudflare-email <value>      Cloudflare email (CERTMGR_CLOUDFLARE_EMAIL)
+  --cloudflare-token <value>      Cloudflare token (CERTMGR_CLOUDFLARE_TOKEN)
+  --renewal-mode <true|false>     Renewal mode (CERTMGR_RENEWAL_MODE, default: false)
+  --staging <true|false>          Use staging LE env (CERTMGR_STAGING, default: false)
+  --dns-provider <auto|desec|cloudflare>  DNS provider (CERTMGR_DNS_PROVIDER, default: auto)
+  --stage <manual|export|upload>  Start from specific stage (CERTMGR_STAGE)
+  --help                          Show this help
+EOF
+}
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --domain)
+            DOMAIN="${2:-}"
+            shift 2
+            ;;
+        --email)
+            EMAIL="${2:-}"
+            shift 2
+            ;;
+        --desec-token)
+            DESEC_TOKEN="${2:-}"
+            shift 2
+            ;;
+        --cloudflare-email)
+            CLOUDFLARE_EMAIL="${2:-}"
+            shift 2
+            ;;
+        --cloudflare-token)
+            CLOUDFLARE_TOKEN="${2:-}"
+            shift 2
+            ;;
+        --azure-tenant-id)
+            AZURE_TENANT_ID="${2:-}"
+            shift 2
+            ;;
+        --azure-client-id)
+            AZURE_CLIENT_ID="${2:-}"
+            shift 2
+            ;;
+        --azure-client-secret)
+            AZURE_CLIENT_SECRET="${2:-}"
+            shift 2
+            ;;
+        --azure-keyvault-name)
+            AZURE_KEYVAULT_NAME="${2:-}"
+            shift 2
+            ;;
+        --azure-cert-name)
+            AZURE_CERT_NAME="${2:-}"
+            shift 2
+            ;;
+        --renewal-mode)
+            RENEWAL_MODE="${2:-}"
+            shift 2
+            ;;
+        --staging)
+            STAGING="${2:-}"
+            shift 2
+            ;;
+        --dns-provider)
+            DNS_PROVIDER="${2:-}"
+            shift 2
+            ;;
+        --stage)
+            RAW_STAGE="${2:-}"
+            shift 2
+            ;;
+        --help)
+            usage
+            exit 0
+            ;;
+        *)
+            if [[ "$1" == --* ]]; then
+            echo "Unknown option: $1" >&2
+            usage >&2
+            exit 1
+            fi
+            if [ -z "${RAW_STAGE:-}" ]; then
+                RAW_STAGE="$1"
+                shift
+            else
+                echo "Unexpected positional argument: $1" >&2
+                usage >&2
+                exit 1
+            fi
+            ;;
+    esac
+done
+
+STAGE="$RAW_STAGE"
+if [[ "$STAGE" == stage=* ]]; then
+    STAGE="${STAGE#stage=}"
+fi
+STAGE="${STAGE,,}"
 
 echo "=== Certbot Azure Certificate Manager configuration ==="
 echo "Domain: $DOMAIN"
@@ -124,6 +242,7 @@ echo "Renewal Mode: $RENEWAL_MODE"
 echo "Staging: $STAGING"
 echo "Keepalive: ${CERTMGR_KEEPALIVE:-false}"
 echo "DNS Provider: $DNS_PROVIDER"
+echo "Stage: ${STAGE:-full}"
 
 # ============================================================================
 # Helper Functions
@@ -143,8 +262,11 @@ log_error() {
 
 validate_required_params() {
     local missing_params=()
-    [ -z "$DOMAIN" ] && missing_params+=("DOMAIN")
-    [ -z "$EMAIL" ] && missing_params+=("EMAIL")
+    # Only validate domain and email for full or manual stages
+    if [ -z "$STAGE" ] || [ "$STAGE" = "manual" ]; then
+        [ -z "$DOMAIN" ] && missing_params+=("DOMAIN")
+        [ -z "$EMAIL" ] && missing_params+=("EMAIL")
+    fi
     [ -z "$AZURE_TENANT_ID" ] && missing_params+=("AZURE_TENANT_ID")
     [ -z "$AZURE_CLIENT_ID" ] && missing_params+=("AZURE_CLIENT_ID")
     [ -z "$AZURE_CLIENT_SECRET" ] && missing_params+=("AZURE_CLIENT_SECRET")
@@ -153,8 +275,9 @@ validate_required_params() {
 
     if [ ${#missing_params[@]} -gt 0 ]; then
         log_error "Missing required parameters: ${missing_params[*]}"
-        log_error "Usage: $0 <domain> <email> <desec_token> <azure_tenant_id> <azure_client_id> <azure_client_secret> <azure_keyvault_name> <azure_cert_name> [renewal_mode] [staging]"
-        log_error "Or set environment variables: CERTMGR_DOMAIN, CERTMGR_EMAIL, CERTMGR_DESEC_TOKEN, CERTMGR_AZURE_TENANT_ID, CERTMGR_AZURE_CLIENT_ID, CERTMGR_AZURE_CLIENT_SECRET, CERTMGR_AZURE_KEYVAULT_NAME, CERTMGR_AZURE_CERT_NAME"
+        log_error "Use command line switches (for example: --domain, --email, --azure-tenant-id, --azure-client-id, --azure-client-secret, --azure-keyvault-name, --azure-cert-name)"
+        log_error "Or set environment variables: CERTMGR_DOMAIN, CERTMGR_EMAIL, CERTMGR_DESEC_TOKEN, CERTMGR_CLOUDFLARE_EMAIL, CERTMGR_CLOUDFLARE_TOKEN, CERTMGR_AZURE_TENANT_ID, CERTMGR_AZURE_CLIENT_ID, CERTMGR_AZURE_CLIENT_SECRET, CERTMGR_AZURE_KEYVAULT_NAME, CERTMGR_AZURE_CERT_NAME, CERTMGR_DNS_PROVIDER, CERTMGR_STAGE"
+        log_error "Optional stage values: manual, export, upload"
         error_exit
     fi
 }
@@ -321,32 +444,75 @@ request_certificate() {
         rm -f "/etc/letsencrypt/$DOMAIN/*.ini"
         log_error "Failed to obtain certificate"
         error_exit
+  fi    
+}
+
+request_certificate_manual() {
+    log_info "Starting manual interactive certificate request for domain: $DOMAIN"
+
+    if [ ! -t 0 ] || [ ! -t 1 ]; then
+        log_error "Manual stage requires an interactive TTY"
+        log_error "Run container with -it and use --stage manual"
+        error_exit
+    fi
+
+    local certbot_cmd="certbot certonly -v --manual --preferred-challenges dns"
+    # Newer certbot releases removed this flag; only add it when supported.
+    if certbot --help all 2>/dev/null | grep -q -- "--manual-public-ip-logging-ok"; then
+        certbot_cmd="$certbot_cmd --manual-public-ip-logging-ok"
+    fi
+    certbot_cmd="$certbot_cmd --email $EMAIL"
+    certbot_cmd="$certbot_cmd --domain $DOMAIN"
+
+    if [ "$STAGING" = "true" ]; then
+        log_info "Using Let's Encrypt staging environment"
+        certbot_cmd="$certbot_cmd --staging"
+    fi
+
+    if [ "$RENEWAL_MODE" = "true" ]; then
+        log_info "Running in renewal mode"
+        certbot_cmd="$certbot_cmd --force-renewal"
+    fi
+
+    log_info "Launching interactive certbot manual flow..."
+    if eval "$certbot_cmd"; then
+        log_success "Manual certificate request completed successfully"
+    else
+        log_error "Manual certificate request failed"
+        error_exit        
     fi    
 }
 
 export_certificates() {
     log_info "Exporting certificates to /mnt/secrets-output"
-    
+
+    # Use parent domain for wildcard certs
+    local export_domain="$DOMAIN"
+    if [[ "$export_domain" == \*.* ]]; then
+        export_domain="${export_domain#*.}"
+        log_info "Detected wildcard domain. Using parent domain for export: $export_domain"
+    fi
+
     # Determine certificate path
-    local cert_path="/etc/letsencrypt/live/$DOMAIN"
-    
+    local cert_path="/etc/letsencrypt/live/$export_domain"
+
     if [ ! -d "$cert_path" ]; then
         log_error "Certificate directory not found: $cert_path"
         error_exit
     fi
-    
+
     # Copy certificates to output directory
     cp "$cert_path/fullchain.pem" "/mnt/secrets-output/fullchain.pem"
     cp "$cert_path/privkey.pem" "/mnt/secrets-output/privkey.pem"
     cp "$cert_path/cert.pem" "/mnt/secrets-output/cert.pem"
     cp "$cert_path/chain.pem" "/mnt/secrets-output/chain.pem"
-    
+
     # Set permissions
     chmod 644 /mnt/secrets-output/fullchain.pem
     chmod 644 /mnt/secrets-output/cert.pem
     chmod 644 /mnt/secrets-output/chain.pem
     chmod 600 /mnt/secrets-output/privkey.pem
-    
+
     log_success "Certificates exported to /mnt/secrets-output"
 }
 
@@ -366,16 +532,31 @@ upload_to_azure_keyvault() {
     
     log_info "Uploading certificate to Azure Key Vault: $AZURE_KEYVAULT_NAME"
     
+    # Use parent domain for wildcard certs (match export_certificates logic)
+    local upload_domain="$DOMAIN"
+    if [[ "$upload_domain" == \*.* ]]; then
+        upload_domain="${upload_domain#*.}"
+        log_info "Detected wildcard domain. Using parent domain for upload: $upload_domain"
+    fi
+
     # Create PFX file from certificate and private key
-    local pfx_file="/etc/letsencrypt/$DOMAIN/certificate.pfx"
+    local pfx_file="/etc/letsencrypt/$upload_domain/certificate.pfx"
     local pfx_password
     pfx_password=$(openssl rand -base64 32)
-    
+
+    # Prefer certificates exported to mounted secrets, fallback to certbot live path
+    local privkey_path="/mnt/secrets-output/privkey.pem"
+    local fullchain_path="/mnt/secrets-output/fullchain.pem"
+    if [[ ! -f "$privkey_path" || ! -f "$fullchain_path" ]]; then
+        privkey_path="/etc/letsencrypt/live/$upload_domain/privkey.pem"
+        fullchain_path="/etc/letsencrypt/live/$upload_domain/fullchain.pem"
+    fi
+
     # Convert to PFX format
     openssl pkcs12 -export \
         -out "$pfx_file" \
-        -inkey /mnt/secrets-output/privkey.pem \
-        -in /mnt/secrets-output/fullchain.pem \
+        -inkey "$privkey_path" \
+        -in "$fullchain_path" \
         -passout pass:"$pfx_password"
     
     # Upload to Azure Key Vault
@@ -405,25 +586,42 @@ upload_to_azure_keyvault() {
 
 main() {
     log_info "=== Starting ==="
-    
-    # Validate parameters
-    validate_required_params
-    
-    # Setup output directory
-    setup_output_directory
-    
-    # Detect and validate DNS provider
-    detect_dns_provider
-    validate_provider_credentials
-    
-    # Request or renew certificate
-    request_certificate
-    
-    # Export certificates
-    export_certificates
-    
-    # Upload to Azure Key Vault
-    upload_to_azure_keyvault
+
+    case "$STAGE" in
+        "")
+            # Full flow
+            validate_required_params
+            setup_output_directory
+            detect_dns_provider
+            validate_provider_credentials
+            request_certificate
+            export_certificates
+            upload_to_azure_keyvault
+            ;;
+        manual)
+            log_info "Stage mode: manual (interactive certbot manual flow, then export/upload)"
+            validate_required_params
+            setup_output_directory
+            request_certificate_manual
+            export_certificates
+            upload_to_azure_keyvault
+            ;;
+        export)
+            log_info "Stage mode: export (starting from export_certificates)"
+            validate_required_params
+            export_certificates
+            upload_to_azure_keyvault
+            ;;
+        upload)
+            log_info "Stage mode: upload (starting from upload_to_azure_keyvault)"
+            validate_required_params
+            upload_to_azure_keyvault
+            ;;
+        *)
+            log_error "Invalid stage: '$STAGE'. Supported values: export, upload"
+            error_exit
+            ;;
+    esac
     
     log_success "=== Certificate management completed successfully ==="
     

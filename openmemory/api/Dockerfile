@@ -59,10 +59,8 @@ RUN pip install /tmp/*.whl && \
 
 # Install test dependencies and run tests before final image
 COPY --link=true openmemory/api/requirements-test.txt .
-RUN pip install -r requirements-test.txt && pytest tests && rm -rf tests/ && find . -type f -name 'test_*.py' -delete
-
-# Copy app files last (better cache invalidation for development)
 COPY --link=true openmemory/api/ .
+RUN pip install -r requirements-test.txt && pytest tests && rm -rf tests/ && find . -type f -name 'test_*.py' -delete
 
 # Fix ownership of copied files and switch to non-root user
 RUN chown -R appuser:appuser /usr/src/openmemory

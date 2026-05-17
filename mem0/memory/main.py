@@ -328,7 +328,7 @@ class Memory(MemoryBase):
 
         system_prompt, user_prompt = get_fact_retrieval_messages(parsed_messages)
         if self.config.custom_fact_extraction_prompt:
-            system_prompt = self.config.custom_fact_extraction_prompt
+            system_prompt = "\n".join([system_prompt, self.config.custom_fact_extraction_prompt])
 
         response = self.llm.generate_response(
             messages=[
@@ -1171,7 +1171,7 @@ class AsyncMemory(MemoryBase):
         parsed_messages = parse_messages(messages)
         system_prompt, user_prompt = get_fact_retrieval_messages(parsed_messages)
         if self.config.custom_fact_extraction_prompt:
-            system_prompt = self.config.custom_fact_extraction_prompt
+            system_prompt = "\n".join([system_prompt, self.config.custom_fact_extraction_prompt])
 
         response = await asyncio.to_thread(
             self.llm.generate_response,

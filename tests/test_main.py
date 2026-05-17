@@ -267,14 +267,12 @@ def test_custom_prompts(memory_custom_instance):
             ## custom prompt
             ##
             mock_parse_messages.assert_called_once_with(messages)
-
-            memory_custom_instance.llm.generate_response.assert_any_call(
-                messages=[
-                    {"role": "system", "content": memory_custom_instance.config.custom_fact_extraction_prompt},
-                    {"role": "user", "content": f"Input:\n{mock_parse_messages.return_value}"},
-                ],
-                response_format={"type": "json_object"},
-            )
+            system_message = memory_custom_instance.llm.generate_response.call_args_list[0].kwargs["messages"][0][
+                "content"
+            ]
+            assert memory_custom_instance.config.custom_fact_extraction_prompt in system_message
+            assert system_message.startswith("You are a Personal Information Organizer")
+            assert system_message != memory_custom_instance.config.custom_fact_extraction_prompt
 
             ## custom update memory prompt
             ##

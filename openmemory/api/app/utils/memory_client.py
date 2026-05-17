@@ -123,13 +123,17 @@ async def search_memories(
                 # Get accessible memory IDs based on ACL
                 with _TRACER.start_as_current_span("db.fetch_user_memories"):
                     user_memories = db.query(Memory).filter(Memory.user_id == user.id).all()
-                    from app.utils.permissions import check_memory_access_permissions
-                    accessible_memory_ids = [
-                        memory.id
-                        for memory in user_memories
-                        # pyrefly: ignore [bad-argument-type]
-                        if check_memory_access_permissions(db, memory, user, app_id=app.id)
-                    ]
+                    from app.utils.permissions import get_accessible_memory_ids
+
+                    if app.is_active:
+                        accessible_memory_id_set = set(get_accessible_memory_ids(db, user, app))
+                        accessible_memory_ids = [
+                            memory.id
+                            for memory in user_memories
+                            if memory.id in accessible_memory_id_set
+                        ]
+                    else:
+                        accessible_memory_ids = []
 
                 # Build baseline conditions
                 conditions = [qdrant_models.FieldCondition(key="user_id", match=qdrant_models.MatchValue(value=user_id))]

@@ -212,7 +212,7 @@ def get_default_memory_config(expandSecrets: bool = True) -> dict:
     graphProvider = parse_environment_variable_value("env:MEM0_PROVIDER_GRAPHSTORE")
     customExtractionPrompt = parse_environment_variable_value("env:MEM0_EXTRACTION_PROMPT", None, expandSecrets)
     customUpdateMemoryPrompt = parse_environment_variable_value("env:MEM0_UPDATE_MEMORY_PROMPT", None, expandSecrets)
-    graphSkipDb = parse_environment_variable_value("env:bool:GRAPH_SKIP_DB", False, expandSecrets)
+    graphSkipDb = parse_environment_variable_value("env:bool:GRAPH_SKIP_DB", False, expandSecrets = True)
 
     defaultValues: dict = {
         "llm": {

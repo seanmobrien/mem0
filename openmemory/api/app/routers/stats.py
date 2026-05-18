@@ -9,6 +9,7 @@ from typing import Optional
 from fastapi import Depends
 from mem0.utils.factory import VectorStoreFactory
 import mem0
+from mem0.configs.base import MemoryConfig
 from datetime import datetime, timezone
 from app.auth import get_current_user, get_user_record, check_auth_service_health
 from opentelemetry import trace
@@ -248,7 +249,7 @@ async def health_check(
                         graph_enabled = True
                         if graphProvider is None:
                             from mem0.memory.graph_memory import MemoryGraph
-                            graphProvider = MemoryGraph(config)
+                            graphProvider = MemoryGraph(MemoryConfig(**config))
                         graph_store_available = graphProvider is not None
             except Exception as e:
                 logger.error(f"Graph Store connection error: {str(e)}")

@@ -126,12 +126,16 @@ async def search_memories(
                     from app.utils.permissions import get_accessible_memory_ids
 
                     if app.is_active:
-                        accessible_memory_id_set = set(get_accessible_memory_ids(db, user, app))
-                        accessible_memory_ids = [
-                            memory.id
-                            for memory in user_memories
-                            if memory.id in accessible_memory_id_set
-                        ]
+                        app_uuid = uuid.UUID(str(app.id))
+                        accessible_memory_id_set = get_accessible_memory_ids(db, app_uuid, user)
+                        if accessible_memory_id_set is None:
+                            accessible_memory_ids = [memory.id for memory in user_memories]
+                        else:
+                            accessible_memory_ids = [
+                                memory.id
+                                for memory in user_memories
+                                if memory.id in accessible_memory_id_set
+                            ]
                     else:
                         accessible_memory_ids = []
 

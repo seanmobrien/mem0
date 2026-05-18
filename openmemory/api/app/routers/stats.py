@@ -65,7 +65,7 @@ async def get_profile(
     total_memories = db.query(Memory).filter(Memory.user_id == user.id, Memory.state != MemoryState.deleted).count()
 
     # Get total number of apps
-    apps = db.query(App).filter(App.owner == user)
+    apps = db.query(App).filter(App.owner_id == user.id)
     total_apps = apps.count()
 
     return {

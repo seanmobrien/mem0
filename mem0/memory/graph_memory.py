@@ -37,6 +37,12 @@ class MemoryGraph:
             refresh_schema=False,
             driver_config={"notifications_min_severity": "OFF"},
         )
+        # langchain_neo4j defaults database to 'neo4j' when none is provided,
+        # which causes Bolt routing table failures on AuraDB and other single-database
+        # instances. When no database was explicitly configured, reset to None so the
+        # driver uses the home database without a routing-table lookup.
+        if self.config.graph_store.config.database is None:
+            self.graph._database = None
         self.embedding_model = EmbedderFactory.create(
             self.config.embedder.provider, self.config.embedder.config, self.config.vector_store.config
         )

@@ -16,10 +16,10 @@ pytest-cov>=4.0.0
 tenacity==9.1.2
 anthropic==0.51.0
 ollama==0.4.8
-azure-monitor-opentelemetry==1.5.0
-opentelemetry-api==1.41.1
-opentelemetry-sdk==1.41.1
-opentelemetry-exporter-otlp-proto-grpc==1.41.1
+azure-monitor-opentelemetry==1.8.8
+opentelemetry-api==1.40.0
+opentelemetry-sdk==1.40.0
+opentelemetry-exporter-otlp-proto-grpc==1.40.0
 setuptools>=68.0.0
 
 # Authentication dependencies

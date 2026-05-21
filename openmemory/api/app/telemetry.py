@@ -16,8 +16,8 @@ _configured = False
 
 
 DISABLED_INSTRUMENTATIONS = {
-    # azure-monitor-opentelemetry 1.5.0 conflicts with pkg_resources entry point dist() calls
-    # under Python 3.12; disable auto-instrumentation for now and rely on explicit spans.
+    # azure-monitor-opentelemetry still conflicts with pkg_resources entry point dist() calls
+    # under Python 3.12; disable auto-instrumentation and rely on explicit spans.
     name: {"enabled": False}
     for name in (
         "fastapi",

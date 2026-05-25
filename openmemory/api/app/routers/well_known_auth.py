@@ -69,7 +69,7 @@ async def oauth_protected_resource_metadata(resource_path: str = "") -> JSONResp
 		],
 
 		# Helpful discovery items for clients/resource servers
-		"scopes_supported": ["openid", "profile", "email", "offline_access", "mcp_tool", "mcp_tool:read"],
+		"scopes_supported": ["openid", "profile", "email", "offline_access", "mcp_tool", "mcp_tool:read", "mcp_tool:write"],
 		"response_types_supported": ["code", "token", "id_token"],
 		"grant_types_supported": ["authorization_code", "refresh_token", "client_credentials", "urn:ietf:params:oauth:grant-type:jwt-bearer"],
 	}

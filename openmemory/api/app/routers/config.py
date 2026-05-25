@@ -1,13 +1,13 @@
 from typing import Dict, Any, Optional
 from app.utils.client_config_factory import split_config
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 import logging
 from app.database import get_db
 from app.models import Config as ConfigModel
 from app.utils.memory import reset_memory_client
-from app.auth import get_current_user, get_user_record
+from app.auth import get_current_user, get_user_record, optional_auth
 from app.auth import require_admin
 from opentelemetry import trace
 from opentelemetry.trace import SpanKind, Status, StatusCode
@@ -147,10 +147,10 @@ def get_default_config():
         "mem0": Mem0Config.model_validate(split.get("mem0", {}))
     }
 
-def get_saved_memory_config():
+def get_saved_memory_config(expand_secrets: bool = False):
     """Gets saved configuration formatted for the API and database."""
     from app.utils.client_config_factory import get_parsed_memory_config
-    source = get_parsed_memory_config(expandSecrets=False)
+    source = get_parsed_memory_config(expandSecrets=expand_secrets)
     split = split_config(source)    
     try:        
         parsed = ConfigSchema.model_validate(split)
@@ -159,11 +159,79 @@ def get_saved_memory_config():
         logger.error(f"Error validating configuration: {e}")
         raise HTTPException(status_code=500, detail="Invalid configuration format")    
 
+
+def _is_truthy(value: Optional[str]) -> bool:
+    if value is None:
+        return False
+    return value.strip().lower() in {"1", "true", "t", "yes", "y", "on"}
+
+
+def _has_mcp_tool_write_access(current_user: Optional[Dict[str, Any]]) -> bool:
+    if not isinstance(current_user, dict):
+        return False
+
+    # Accept both RFC scope string and list-shaped claim variants.
+    scope_claim = current_user.get("scope") or current_user.get("scp") or ""
+    scopes: set[str] = set()
+    if isinstance(scope_claim, str):
+        scopes = set(scope_claim.split())
+    elif isinstance(scope_claim, list):
+        scopes = {str(scope).strip() for scope in scope_claim}
+    if "mcp_tool:write" in scopes:
+        return True
+
+    # Check Keycloak-like nested resource access claims.
+    resource_access = current_user.get("resource_access", {})
+    if isinstance(resource_access, dict):
+        for resource_data in resource_access.values():
+            if not isinstance(resource_data, dict):
+                continue
+            roles = resource_data.get("roles", [])
+            permissions = resource_data.get("permissions", [])
+            if isinstance(roles, list) and "mcp_tool:write" in roles:
+                return True
+            if isinstance(permissions, list) and "mcp_tool:write" in permissions:
+                return True
+    return False
+
+
+def _log_secrets_access_denial(current_user: Optional[Dict[str, Any]]) -> None:
+    auth_present = isinstance(current_user, dict)
+    logger.warning(
+        "Denied resolved config request without mcp_tool:write access",
+        extra={
+            "auth_present": auth_present,
+            "secrets_requested": True,
+            "required_access": "mcp_tool:write",
+        },
+    )
+
+    span = trace.get_current_span()
+    if span is not None:
+        span.set_attribute("mem0.config.secrets_requested", True)
+        span.set_attribute("mem0.config.secrets_authorized", False)
+        span.set_attribute("mem0.config.auth_present", auth_present)
+        span.add_event(
+            "config.secrets_access_denied",
+            {
+                "mem0.required_access": "mcp_tool:write",
+                "mem0.auth_present": auth_present,
+            },
+        )
+
 @router.get("/", response_model=ConfigSchema)
 @traced_endpoint("config.get")
-async def get_configuration(db: Session = Depends(get_db)):
+async def get_configuration(
+    secrets: Optional[str] = Query(default=None, include_in_schema=False),
+    db: Session = Depends(get_db),
+    current_user: Optional[Dict[str, Any]] = Depends(optional_auth),
+):
     """Get the current configuration."""
-    config = get_saved_memory_config()
+    secrets_requested = _is_truthy(secrets)
+    expand_secrets = secrets_requested and _has_mcp_tool_write_access(current_user)
+    if secrets_requested and not expand_secrets:
+        _log_secrets_access_denial(current_user)
+    config = get_saved_memory_config(expand_secrets=expand_secrets)
     if not config:
         # If no configuration exists, return the default configuration
         config = get_default_config()  

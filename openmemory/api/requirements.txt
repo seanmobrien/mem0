@@ -17,6 +17,8 @@ tenacity==9.1.2
 anthropic==0.51.0
 ollama==0.4.8
 azure-monitor-opentelemetry==1.8.8
+# azure-monitor-opentelemetry 1.8.8 pins opentelemetry-sdk==1.40 upstream,
+# so keep the core OpenTelemetry packages aligned at 1.40.0 to avoid resolver conflicts.
 opentelemetry-api==1.40.0
 opentelemetry-sdk==1.40.0
 opentelemetry-exporter-otlp-proto-grpc==1.40.0
